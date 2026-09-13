@@ -26,6 +26,7 @@ void main() {
         for (final t in session.relayTasks)
           if ('${t['taskId']}'.isNotEmpty) '${t['taskId']}',
       ];
+      final childIds = <String>[];
       for (final taskId in tasks.take(6)) {
         final handle = await session.subscribe(taskId);
         for (var i = 0; i < 12 && handle.state.snapshot == null; i++) {
@@ -34,9 +35,54 @@ void main() {
         final snap = handle.state.snapshot ?? const {};
         // ignore: avoid_print
         print('PROBE task=$taskId goal=${snap['goal']} '
-            'subagents=${snap['subagents']} plan=${snap['plan']}');
+            'subagents=${snap['subagents']} plan=${snap['plan']} '
+            'backgroundWorks=${snap['backgroundWorks']}');
+        final rows = handle.state.rows;
+        // ignore: avoid_print
+        print('PROBE task=$taskId rowCount=${rows.length} rowKinds=${rows
+            .map((r) => '${r['kind']}')
+            .toSet()
+            .toList()}');
+        final subs = rows.where((r) => r['kind'] == 'subagent').toList();
+        // ignore: avoid_print
+        print('PROBE task=$taskId subagentRows=${subs.length}');
+        for (final s in subs.take(3)) {
+          // ignore: avoid_print
+          print('PROBE subagentRow=$s');
+        }
+        final subagents = snap['subagents'];
+        if (subagents is Map && subagents['childSessionIds'] is List) {
+          for (final c in subagents['childSessionIds'] as List) {
+            if (c is String && c.isNotEmpty) childIds.add(c);
+          }
+        }
         await handle.close();
         await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+      // Try subscribing to a subagent child session: if accepted, the full
+      // child conversation (its rows) is fetchable — the data source for a
+      // "subagent detail" view.
+      if (childIds.isNotEmpty) {
+        final child = childIds.first;
+        try {
+          final handle = await session.subscribe(child);
+          for (var i = 0; i < 12 && handle.state.snapshot == null; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 500));
+          }
+          final snap = handle.state.snapshot;
+          // ignore: avoid_print
+          print('PROBE child=$child subscribed=true snapshotKeys='
+              '${snap?.keys.toList()}');
+          // ignore: avoid_print
+          print('PROBE child meta=${snap?['meta']} config=${snap?['config']}');
+          // ignore: avoid_print
+          print('PROBE child rowCount=${handle.state.rows.length} rowKinds='
+              '${handle.state.rows.map((r) => '${r['kind']}').toSet().toList()}');
+          await handle.close();
+        } catch (e) {
+          // ignore: avoid_print
+          print('PROBE child=$child subscribed=false error=$e');
+        }
       }
     } finally {
       await session.dispose();
