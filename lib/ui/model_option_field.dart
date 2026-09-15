@@ -199,7 +199,7 @@ class _ModelOptionFieldState extends State<ModelOptionField> {
   Widget build(BuildContext context) {
     final name = _displayName;
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(ZRadius.field),
       onTap: _openSheet,
       child: InputDecorator(
         decoration: InputDecoration(

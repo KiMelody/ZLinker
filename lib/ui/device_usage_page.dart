@@ -192,7 +192,7 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: ZColors.sky500.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(ZRadius.tile),
                     ),
                     child: const Icon(Icons.bolt, color: ZColors.sky500),
                   ),
@@ -245,7 +245,7 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                     ),
                     const SizedBox(height: 8),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(ZRadius.mini),
                       child: LinearProgressIndicator(
                         value:
                             ((remaining['percentage'] as num?) ?? 0) / 100,
@@ -456,7 +456,7 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                 ),
                 for (final r in _appRanges)
                   InkWell(
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(ZRadius.mini),
                     onTap: () {
                       if (_appRange == r || _appLoading) return;
                       setState(() => _appRange = r);
@@ -515,7 +515,7 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                       ),
                       const SizedBox(height: 2),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(ZRadius.mini),
                         child: SizedBox(
                           height: 5,
                           child: Row(
@@ -669,7 +669,7 @@ class _LimitRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(ZRadius.mini),
                 child: LinearProgressIndicator(
                   value: (percentage / 100).clamp(0.0, 1.0),
                   minHeight: 4,

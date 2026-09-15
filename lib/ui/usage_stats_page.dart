@@ -125,7 +125,7 @@ class _UsageStatsPageState extends State<UsageStatsPage> {
       BuildContext context, String label, String value, IconData icon) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(ZSpacing.card),
         child: Row(
           children: [
             Icon(icon, size: 20, color: ZColors.sky500),

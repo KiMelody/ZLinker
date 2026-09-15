@@ -46,7 +46,7 @@ class PhasePill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(ZRadius.pill),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -76,7 +76,7 @@ class PhasePill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(ZRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

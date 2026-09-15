@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../protocol/conversation.dart';
@@ -16,6 +17,7 @@ import 'phase_pill.dart';
 import 'remote_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
+import 'widgets/swipe_actions.dart';
 
 /// Native task list of one device (official mobile layout): a connection
 /// banner, the "workspaces and tasks" header with stats, and one card per
@@ -145,6 +147,7 @@ class _TaskListPageState extends State<TaskListPage> {
     final isActive = _isWorkspaceActive(session, ws);
     final key = workspaceKeyOf(ws) ?? workspaceTitle(ws);
     if (!isActive && openIfInactive) session.openWorkspace(ws);
+    HapticFeedback.lightImpact();
     setState(
       () => _expandOverrides[key] = !_isWorkspaceExpanded(
         key,
@@ -357,11 +360,11 @@ class _TaskListPageState extends State<TaskListPage> {
                   color: isDark
                       ? ZColors.darkBackground
                       : ZColors.lightBackground,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(ZRadius.tile),
                   border: Border.all(color: ZInk.hairline(context)),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(ZRadius.tile),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minWidth: 320),
                     child: _chatPane(context),
@@ -503,7 +506,7 @@ class _TaskListPageState extends State<TaskListPage> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(ZRadius.field),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
@@ -582,7 +585,7 @@ class _TaskListPageState extends State<TaskListPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ZRadius.field),
           onTap: () => _toggleWorkspace(session, ws),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -662,9 +665,9 @@ class _TaskListPageState extends State<TaskListPage> {
         color: selected
             ? Colors.white.withValues(alpha: 0.1)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ZRadius.field),
           onTap: () => _openWorkspaceTask(session, workspace, entry, title),
           onLongPress: () {
             final s = _session;
@@ -729,7 +732,7 @@ class _TaskListPageState extends State<TaskListPage> {
 
   void _openUsage(DeviceSession session) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => DeviceUsagePage(session: session)),
+      zRoute((_) => DeviceUsagePage(session: session)),
     );
   }
 
@@ -927,6 +930,9 @@ class _TaskListPageState extends State<TaskListPage> {
           onRefresh: () async =>
               session?.reloadTasks() ?? widget.hub.ensure(widget.device),
           child: ListView.builder(
+            // Always scrollable: a short list (one workspace, no tasks) must
+            // still accept the pull gesture for the refresh indicator.
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
             itemCount: rows.length,
             itemBuilder: (context, i) => rows[i],
@@ -944,7 +950,8 @@ class _TaskListPageState extends State<TaskListPage> {
       showDragHandle: true,
       builder: (sheetCtx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          padding: const EdgeInsets.fromLTRB(
+              ZSpacing.screen, 0, ZSpacing.screen, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1040,7 +1047,8 @@ class _TaskListPageState extends State<TaskListPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.fromLTRB(
+                  ZSpacing.screen, 0, ZSpacing.screen, 8),
               child: Text(
                 tr(sheetCtx, 'tasks.tidy.groupLabel'),
                 style: ZType.heading,
@@ -1066,9 +1074,11 @@ class _TaskListPageState extends State<TaskListPage> {
                   ),
               ],
             ),
-            const Divider(height: 1, indent: 20, endIndent: 20),
+            const Divider(
+                height: 1, indent: ZSpacing.screen, endIndent: ZSpacing.screen),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              padding: const EdgeInsets.fromLTRB(
+                  ZSpacing.screen, 12, ZSpacing.screen, 4),
               child: Text(
                 tr(sheetCtx, 'tasks.tidy.sortLabel'),
                 style: ZType.sub.copyWith(
@@ -1148,44 +1158,43 @@ class _TaskListPageState extends State<TaskListPage> {
       if (ws != null) workspaceTitle(ws),
       relativeTimeShort(context, entry.lastActivityAt),
     ].join(' · ');
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: ZInk.hairline(context)),
-      ),
-      child: InkWell(
-        onTap: () => _openWorkspaceTask(session, ws, entry, title),
-        onLongPress: () => _taskActions(context, session, entry),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyStrong.copyWith(
-                        fontWeight: FontWeight.w500,
+    return SwipeActionsRow(
+      actions: _swipeActions(session, entry),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openWorkspaceTask(session, ws, entry, title),
+          onLongPress: () => _taskActions(context, session, entry),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyStrong.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.sub.copyWith(color: ZInk.faint(context)),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.sub.copyWith(color: ZInk.faint(context)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              PhasePill(label: phaseLabel, phase: entry.phase, solid: true),
-            ],
+                const SizedBox(width: 8),
+                PhasePill(label: phaseLabel, phase: entry.phase, solid: true),
+              ],
+            ),
           ),
         ),
       ),
@@ -1351,10 +1360,6 @@ class _TaskListPageState extends State<TaskListPage> {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: ZInk.hairline(context)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1384,37 +1389,20 @@ class _TaskListPageState extends State<TaskListPage> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.folder_outlined,
-                              size: 13,
-                              color: ZInk.ghost(context),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${ws['workspacePath'] ?? ''}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: ZType.caption.copyWith(
-                                  color: ZInk.faint(context),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (lastActivity != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            trP(context, 'tasks.updatedAt', [
+                        // Path · activity, one caption line (R6): the folder
+                        // icon and the separate 更新于 row are gone.
+                        Text(
+                          [
+                            '${ws['workspacePath'] ?? ''}',
+                            if (lastActivity != null)
                               relativeTimeShort(context, lastActivity),
-                            ]),
-                            style: ZType.caption.copyWith(
-                              color: ZInk.ghost(context),
-                            ),
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.caption.copyWith(
+                            color: ZInk.faint(context),
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ),
@@ -1428,7 +1416,7 @@ class _TaskListPageState extends State<TaskListPage> {
                     expanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    size: 20,
+                    size: ZTile.iconSize,
                     color: ZInk.ghost(context),
                   ),
                   const SizedBox(width: 4),
@@ -1503,7 +1491,7 @@ class _TaskListPageState extends State<TaskListPage> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(ZRadius.mini),
       ),
       child: Text(
         tr(context, 'tasks.workspaceKind.$kind'),
@@ -1530,8 +1518,8 @@ class _TaskListPageState extends State<TaskListPage> {
     }
 
     return SizedBox(
-      width: 34,
-      height: 34,
+      width: zTouchWidth,
+      height: zTouchHeight,
       child: IconButton(
         tooltip: newLabel,
         padding: EdgeInsets.zero,
@@ -1571,20 +1559,22 @@ class _TaskListPageState extends State<TaskListPage> {
     final awaiting = entry.pendingInteraction != null;
     final unread = entry.raw['unreadAt'] != null;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      child: Material(
-        color: highlight
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _openWorkspaceTask(session, workspace, entry, title),
-          onLongPress: () => _taskActions(context, session, entry),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 62),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 8, vertical: ZListRow.gap),
+      child: SwipeActionsRow(
+        actions: _swipeActions(session, entry),
+        child: Material(
+          color: highlight
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(ZRadius.field),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(ZRadius.field),
+            onTap: () => _openWorkspaceTask(session, workspace, entry, title),
+            onLongPress: () => _taskActions(context, session, entry),
+            // Row height follows the content: ZListRow.padding only (R5).
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+              padding: ZListRow.padding,
               child: Row(
                 children: [
                   Expanded(
@@ -1595,8 +1585,8 @@ class _TaskListPageState extends State<TaskListPage> {
                           children: [
                             if (unread) ...[
                               Container(
-                                width: 7,
-                                height: 7,
+                                width: ZListRow.dot,
+                                height: ZListRow.dot,
                                 decoration: const BoxDecoration(
                                   color: ZColors.sky500,
                                   shape: BoxShape.circle,
@@ -1647,13 +1637,55 @@ class _TaskListPageState extends State<TaskListPage> {
     );
   }
 
+  /// Left-swipe quick actions shared by the task rows: the same three verbs
+  /// the long-press sheet offers for a fast pass over the list (归档 /
+  /// 标记未读 / 删除). Delete keeps its confirmation dialog.
+  List<SwipeAction> _swipeActions(DeviceSession session, SessionEntry entry) {
+    final archived = entry.raw['archived'] == true;
+    final unread = entry.raw['unreadAt'] != null;
+    return [
+      SwipeAction(
+        icon: archived ? Icons.unarchive_outlined : Icons.archive_outlined,
+        label: tr(
+          context,
+          archived ? 'tasks.action.unarchive' : 'tasks.action.archive',
+        ),
+        color: ZColors.sky500,
+        onTap: () => _runOp(() async {
+          await session.setTaskArchived(entry.sessionId, !archived);
+          await session.reloadTasks();
+        }),
+      ),
+      SwipeAction(
+        icon: unread
+            ? Icons.mark_email_read_outlined
+            : Icons.mark_email_unread_outlined,
+        label: tr(
+          context,
+          unread ? 'tasks.action.markRead' : 'tasks.action.markUnread',
+        ),
+        color: ZColors.neutral600,
+        onTap: () => _runOp(() async {
+          await session.setTaskUnread(entry.sessionId, !unread);
+          await session.reloadTasks();
+        }),
+      ),
+      SwipeAction(
+        icon: Icons.delete_outline,
+        label: tr(context, 'tasks.action.delete'),
+        color: ZColors.danger,
+        onTap: () => _deleteTaskDialog(session, entry),
+      ),
+    ];
+  }
+
   /// Official `permissionTag`/`userInputTag`: 「等待确认」amber mini-pill.
   Widget _awaitingTag(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: ZColors.warning.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(ZRadius.mini),
       ),
       child: Text(
         tr(context, 'tasks.awaiting'),
@@ -1695,6 +1727,7 @@ class _TaskListPageState extends State<TaskListPage> {
     DeviceSession session,
     SessionEntry entry,
   ) async {
+    HapticFeedback.mediumImpact();
     final running = entry.phase == 'running' || entry.phase == 'prewarming';
     final paused = entry.phase.toLowerCase().contains('pause');
     final pinned = entry.raw['pinned'] == true;
@@ -1935,8 +1968,8 @@ class _TaskListPageState extends State<TaskListPage> {
       return;
     }
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ChatPage(
+      zRoute(
+        (_) => ChatPage(
           gateway: session,
           sessionId: sessionId,
           title: title,
@@ -1962,8 +1995,8 @@ class _TaskListPageState extends State<TaskListPage> {
     await widget.hub.suspend(widget.device.id);
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RemotePage(
+      zRoute(
+        (_) => RemotePage(
           device: widget.device,
           targetSessionId: targetSessionId,
           targetTitle: targetTitle,
@@ -1991,25 +2024,25 @@ class _TaskListPageState extends State<TaskListPage> {
         setState(() => _showArchived = !_showArchived);
       case 'deskSet':
         if (session == null) return;
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => DesktopSettingsPage(session: session),
+        Navigator.of(context).push(zRoute(
+          (_) => DesktopSettingsPage(session: session),
         ));
       case 'usage':
         if (session == null) return;
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => DeviceUsagePage(session: session)),
+          zRoute((_) => DeviceUsagePage(session: session)),
         );
       case 'providers':
         if (session == null) return;
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ModelProvidersPage(session: session),
+          zRoute(
+            (_) => ModelProvidersPage(session: session),
           ),
         );
       case 'automations':
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AutomationsPage(
+          zRoute(
+            (_) => AutomationsPage(
               store: widget.store,
               hub: widget.hub,
               initialDeviceId: widget.device.id,
@@ -2018,8 +2051,8 @@ class _TaskListPageState extends State<TaskListPage> {
         );
       case 'offPeak':
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => OffPeakPage(
+          zRoute(
+            (_) => OffPeakPage(
               store: widget.store,
               hub: widget.hub,
               device: widget.device,
@@ -2147,12 +2180,8 @@ class _ConnectionBanner extends StatelessWidget {
   /// already live in the mobile AppBar).
   Widget _onlineCard(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: ZInk.hairline(context)),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(ZSpacing.card),
         child: Text(
           tr(context, 'tasks.banner.onlineDesc'),
           style: ZType.body.copyWith(height: 1.6, color: ZInk.faint(context)),
@@ -2189,12 +2218,8 @@ class _ConnectionBanner extends StatelessWidget {
       color = ZColors.danger;
     }
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: ZInk.hairline(context)),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(ZSpacing.card),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -322,8 +322,8 @@ class _AddSheetState extends State<_AddSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
+          20 + MediaQuery.of(context).viewInsets.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +355,7 @@ class _AddSheetState extends State<_AddSheet> {
           const SizedBox(height: 10),
           InkWell(
             onTap: _pickTime,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(ZRadius.field),
             child: InputDecorator(
               decoration: InputDecoration(
                   labelText: tr(context, 'sched.time'),

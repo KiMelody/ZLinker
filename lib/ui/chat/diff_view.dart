@@ -194,7 +194,7 @@ class DiffView extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: ZInk.codeBlockBg(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Column(
@@ -207,7 +207,7 @@ class DiffView extends StatelessWidget {
               decoration: BoxDecoration(
                 color: ZInk.tile(context),
                 borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(10)),
+                    top: Radius.circular(ZRadius.field)),
               ),
               child: Text(
                 diff.filePath!,

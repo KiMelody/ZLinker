@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -65,8 +66,87 @@ abstract final class ZSpacing {
   /// separation between two cards equals [cardGap].
   static const double cardGap = 16;
 
-  /// Page edge padding for card-list screens.
+  /// Page edge padding for card-list screens, and the horizontal content
+  /// padding inside a bottom sheet.
   static const double screen = 16;
+
+  /// Inner padding of a page card (`ZCard`).
+  static const double card = 16;
+
+  /// Whitespace around a centered empty / error / unavailable state.
+  static const double emptyState = 32;
+}
+
+/// Corner-radius ladder — the only radius values allowed in `lib/ui/`.
+/// Eleven ad-hoc literals (3/4/6/7/8/10/12/14/18/20/22) collapse onto these
+/// five tiers; every call site spells the tier it means.
+abstract final class ZRadius {
+  /// Badges, micro chips, small action buttons (composer send/stop).
+  static const double mini = 6;
+
+  /// Inputs, embedded blocks (code / diff / kv), icon containers.
+  static const double field = 8;
+
+  /// Cards, chat tiles, dialogs, message bubbles.
+  static const double tile = 12;
+
+  /// Bottom-sheet top corners, large avatars, hero empty-state icon.
+  static const double large = 20;
+
+  /// Capsules (status pills, timeline markers).
+  static const double pill = 999;
+}
+
+/// Geometry contract for a row inside a card (`ZListRow`): device rows, task
+/// rows and other card lists share one inset, one height floor and one gap so
+/// the pages stop carrying three different row shapes.
+abstract final class ZListRow {
+  /// Row inset — the card itself adds no padding around rows.
+  static const EdgeInsets padding =
+      EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+
+  /// Height floor for a row with a secondary line (title + meta).
+  static const double twoLineHeight = 60;
+
+  /// Height floor for a single-line row.
+  static const double singleLineHeight = 44;
+
+  /// Gap between two adjacent rows / around the row's highlight block.
+  static const double gap = 4;
+
+  /// Leading icon container (square) and the icon inside it.
+  static const double leadingSize = 36;
+  static const double leadingIcon = 20;
+
+  /// Unread / status dot diameter.
+  static const double dot = 8;
+}
+
+/// Geometry contract for chat turn blocks (`_ReasoningTile`,
+/// `_ToolCallTile`, `_SubagentTile`): one header height, icon size and
+/// horizontal inset, one seam between neighbours, one expanded-body inset.
+/// Type sizes stay semantic (12 label / 13 summary) — only the box is shared.
+abstract final class ZTile {
+  /// Gap below each block, so neighbouring blocks never read as glued.
+  static const double seam = 12;
+
+  /// Header row height floor (header is taller when its content is).
+  static const double headHeight = 38;
+
+  /// Header row horizontal inset.
+  static const double headPadding = 12;
+
+  /// Header leading icon.
+  static const double iconSize = 16;
+
+  /// Header row inset — see [headPadding].
+  static const EdgeInsets head =
+      EdgeInsets.symmetric(horizontal: headPadding);
+
+  /// Expanded body inset (same horizontal inset as the header, no top gap —
+  /// the header row already carries it).
+  static const EdgeInsets body =
+      EdgeInsets.fromLTRB(headPadding, 0, headPadding, seam);
 }
 
 /// Font family bundled with the app. The three static weights come from the
@@ -152,6 +232,64 @@ abstract final class ZType {
       fontFamily: zFontFamily,
       fontFamilyFallback: zFontFallback);
 }
+
+/// Motion: one shared-axis-style transition for every pushed page — the
+/// incoming page slides in horizontally while the outgoing one drifts left,
+/// so pushes never mix the platform's default zoom/fade with a native slide.
+const Duration zPageTransition = Duration(milliseconds: 260);
+const Duration zPageReverseTransition = Duration(milliseconds: 200);
+
+/// Page route with the horizontal slide-in above. Drop-in replacement for
+/// `MaterialPageRoute(builder: ...)`.
+///
+/// iOS/macOS keep the Material route: the platform transition there is
+/// already a horizontal slide, and it carries the interactive edge-swipe back
+/// gesture (the gesture detector lives inside CupertinoPageTransitionsBuilder,
+/// which a bare [PageRouteBuilder] does not provide).
+Route<T> zRoute<T>(WidgetBuilder builder) {
+  if (defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS) {
+    return MaterialPageRoute<T>(builder: builder);
+  }
+  return PageRouteBuilder<T>(
+    transitionDuration: zPageTransition,
+    reverseTransitionDuration: zPageReverseTransition,
+    pageBuilder: (context, animation, secondaryAnimation) => builder(context),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final incoming = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic);
+      final outgoing = CurvedAnimation(
+          parent: secondaryAnimation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic);
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(-0.06, 0),
+        ).animate(outgoing),
+        child: FadeTransition(
+          opacity: incoming,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.08, 0),
+              end: Offset.zero,
+            ).animate(incoming),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// Mobile touch-target floor (≥44×48dp) for icon-only targets that are not a
+/// Material button (Material buttons carry it via
+/// [MaterialTapTargetSize.padded]). Growing only these boxes leaves the
+/// painted icon at its size.
+const double zTouchWidth = 44;
+const double zTouchHeight = 48;
 
 /// Theme-aware text colors mirroring the official foreground tokens.
 class ZInk {
@@ -277,6 +415,10 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
     scaffoldBackgroundColor: background,
     fontFamily: zFontFamily,
     fontFamilyFallback: zFontFallback,
+    // iOS/macOS default to shrinkWrap, which would leave Material buttons
+    // below the ≥44×48dp touch-target floor; padded keeps every button at
+    // kMinInteractiveDimension on all platforms.
+    materialTapTargetSize: MaterialTapTargetSize.padded,
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
       backgroundColor: background,
@@ -293,19 +435,21 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ZRadius.large)),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.primary,
       contentTextStyle: TextStyle(color: scheme.onPrimary),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZRadius.field)),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         side: BorderSide(color: border),
       ),
     ),
@@ -316,21 +460,21 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ZRadius.field),
           borderSide: BorderSide(color: border)),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ZRadius.field),
           borderSide: BorderSide(color: border)),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ZRadius.field),
           borderSide: const BorderSide(color: ZColors.sky500)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ZRadius.field)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         textStyle: ZType.bodyStrong.copyWith(fontWeight: FontWeight.w500),
       ),
@@ -344,7 +488,8 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
     listTileTheme: ListTileThemeData(
       textColor: foreground,
       iconColor: foreground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZRadius.field)),
     ),
   );
 }
@@ -359,7 +504,7 @@ CardThemeData zCardTheme(Brightness brightness) {
     elevation: 0,
     margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12), // official --radius-xl
+      borderRadius: BorderRadius.circular(ZRadius.tile), // official --radius-xl
       side: BorderSide(
           color: dark ? const Color(0x14FFFFFF) : const Color(0x140D0D0D)),
     ),
@@ -371,6 +516,7 @@ DialogThemeData zDialogTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   return DialogThemeData(
     backgroundColor: dark ? ZColors.darkCard : ZColors.lightCard,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ZRadius.tile)),
   );
 }

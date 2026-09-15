@@ -8,7 +8,8 @@ import '../ui_settings.dart';
 
 /// Markdown renderer matching the official web client look: selectable
 /// body text, inline code on a pill background, fenced code blocks with a
-/// language tag and copy button in a self-drawn header bar.
+/// language tag, line count, copy button and collapse toggle in a
+/// self-drawn header bar (collapsed by default).
 class ZLinkerMarkdown extends StatelessWidget {
   final String data;
   final bool selectable;
@@ -96,7 +97,10 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
   }
 }
 
-class _CodeBlock extends StatelessWidget {
+/// Fenced code blocks are collapsed by default: the header shows the
+/// language, the line count and the copy button; tapping the header (or the
+/// chevron) toggles the code body. Long agent dumps stop flooding the chat.
+class _CodeBlock extends StatefulWidget {
   final String code;
   final String language;
   final TextStyle codeStyle;
@@ -108,66 +112,92 @@ class _CodeBlock extends StatelessWidget {
   });
 
   @override
+  State<_CodeBlock> createState() => _CodeBlockState();
+}
+
+class _CodeBlockState extends State<_CodeBlock> {
+  var _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final code = widget.code;
+    final lineCount = code.trim().isEmpty ? 0 : code.trim().split('\n').length;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
         color: ZInk.codeBlockBg(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: ZInk.tile(context),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(10)),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  language.isEmpty ? 'code' : language,
-                  style: ZType.caption.copyWith(
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: ZInk.tile(context),
+                borderRadius: _expanded
+                    ? const BorderRadius.vertical(
+                        top: Radius.circular(ZRadius.field))
+                    : BorderRadius.circular(ZRadius.field),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    widget.language.isEmpty ? 'code' : widget.language,
+                    style: ZType.caption.copyWith(
                       color: ZInk.faint(context),
                       fontFamily: 'monospace'),
-                ),
-                const Spacer(),
-                InkWell(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(tr(context, 'chat.copied')),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(Icons.copy_outlined,
-                        size: 13, color: ZInk.faint(context)),
                   ),
-                ),
-              ],
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(10),
-            child: SelectableText(
-              code.endsWith('\n')
-                  ? code.substring(0, code.length - 1)
-                  : code,
-              style: codeStyle.copyWith(
-                height: 1.5,
-                color: ZInk.codeText(context),
+                  const SizedBox(width: 6),
+                  Text(
+                    trP(context, 'chat.code.lines', ['$lineCount']),
+                    style: ZType.caption.copyWith(color: ZInk.faint(context)),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: code));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(tr(context, 'chat.copied')),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(Icons.copy_outlined,
+                          size: 13, color: ZInk.faint(context)),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: ZInk.faint(context),
+                  ),
+                ],
               ),
             ),
           ),
+          if (_expanded)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(10),
+              child: SelectableText(
+                code.endsWith('\n')
+                    ? code.substring(0, code.length - 1)
+                    : code,
+                style: widget.codeStyle.copyWith(
+                  height: 1.5,
+                  color: ZInk.codeText(context),
+                ),
+              ),
+            ),
         ],
       ),
     );

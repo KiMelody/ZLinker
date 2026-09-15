@@ -157,7 +157,8 @@ class _MentionSheetState extends State<_MentionSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.fromLTRB(
+                  ZSpacing.screen, 0, ZSpacing.screen, 8),
               child: Row(
                 children: [
                   if (_category != null)
@@ -252,7 +253,8 @@ class _MentionSheetState extends State<_MentionSheet> {
               ),
             ],
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+              padding: const EdgeInsets.fromLTRB(
+                  ZSpacing.screen, 4, ZSpacing.screen, 10),
               child: Text(tr(context, 'chat.mention.selectItem'),
                   style: ZType.caption.copyWith(color: ZInk.ghost(context))),
             ),

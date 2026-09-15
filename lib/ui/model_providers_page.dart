@@ -93,7 +93,7 @@ class _ModelProvidersPageState extends State<ModelProvidersPage> {
   Widget _channelUnavailableView(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(ZSpacing.emptyState),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -434,8 +434,8 @@ class _AddProviderSheetState extends State<_AddProviderSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
+          20 + MediaQuery.of(context).viewInsets.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

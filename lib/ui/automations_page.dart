@@ -437,7 +437,7 @@ Future<void> _pickTemplate() async {
   Widget _unavailable(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(ZSpacing.emptyState),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -467,7 +467,7 @@ Future<void> _pickTemplate() async {
   Widget _errorView(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(ZSpacing.emptyState),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -923,8 +923,8 @@ class AutomationSheetState extends State<AutomationSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
+          20 + MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1013,7 +1013,7 @@ class AutomationSheetState extends State<AutomationSheet> {
                 _preset != FrequencyPreset.customInterval)
               InkWell(
                 onTap: _pickTime,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(ZRadius.field),
                 child: InputDecorator(
                   decoration:
                       InputDecoration(labelText: tr(context, 'auto.time')),
@@ -1314,7 +1314,7 @@ class _CustomRepeatDialogState extends State<CustomRepeatDialog> {
                   );
                   if (d != null) setState(() => _endDate = d);
                 },
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(ZRadius.field),
                 child: InputDecorator(
                   decoration:
                       InputDecoration(labelText: tr(context, 'auto.custom.dateLabel')),

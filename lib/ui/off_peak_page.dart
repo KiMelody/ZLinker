@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../protocol/conversation.dart';
 import '../protocol/off_peak.dart';
@@ -180,8 +181,8 @@ class _OffPeakPageState extends State<OffPeakPage>
     final deviceSession = widget.hub.sessionOf(widget.device.id);
     if (!mounted) return;
     if (deviceSession != null) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ChatPage(
+      await Navigator.of(context).push(zRoute(
+        (_) => ChatPage(
           gateway: deviceSession,
           sessionId: sessionId,
           title: task.title.isEmpty
@@ -193,8 +194,8 @@ class _OffPeakPageState extends State<OffPeakPage>
     }
     await widget.hub.suspend(widget.device.id);
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => RemotePage(
+    await Navigator.of(context).push(zRoute(
+      (_) => RemotePage(
         device: widget.device,
         targetSessionId: sessionId,
         targetTitle: task.title.isEmpty ? null : task.title,
@@ -228,6 +229,7 @@ class _OffPeakPageState extends State<OffPeakPage>
         // Official two-pane layout: 设置 / 历史.
         bottom: TabBar(
           controller: _tabs,
+          onTap: (_) => HapticFeedback.selectionClick(),
           tabs: [
             Tab(text: tr(context, 'op.tab.settings')),
             Tab(text: tr(context, 'op.tab.history')),
@@ -337,7 +339,7 @@ class _OffPeakPageState extends State<OffPeakPage>
       color: Theme.of(context).colorScheme.secondaryContainer,
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 6, 4, 10),
+        padding: const EdgeInsets.fromLTRB(ZSpacing.card, 6, 4, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -380,7 +382,7 @@ class _OffPeakPageState extends State<OffPeakPage>
               : null;
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(ZSpacing.card),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -419,7 +421,7 @@ class _OffPeakPageState extends State<OffPeakPage>
     if (parts.isEmpty) return const SizedBox.shrink();
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(ZSpacing.card),
         child: Row(
           children: [
             const Icon(Icons.bolt_outlined, size: 18, color: ZColors.sky500),
@@ -478,7 +480,7 @@ class _OffPeakPageState extends State<OffPeakPage>
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: ZColors.neutral500.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(ZRadius.field),
                           ),
                           child: Text(
                             trP(context, 'op.badge.paused',
@@ -497,7 +499,7 @@ class _OffPeakPageState extends State<OffPeakPage>
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: ZColors.sky500.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(ZRadius.field),
                           ),
                           child: Text(
                             trP(context, 'op.queue', ['${task.queuePosition}']),
@@ -744,7 +746,7 @@ class _OffPeakPageState extends State<OffPeakPage>
   Widget _centerNote(BuildContext context, String title, String body) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(ZSpacing.emptyState),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1024,8 +1026,8 @@ class _OffPeakSheetState extends State<OffPeakSheet> {
         if (ok && mounted) Navigator.pop(this.context);
       },
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
+            20 + MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1111,7 +1113,7 @@ class _OffPeakSheetState extends State<OffPeakSheet> {
               const SizedBox(height: 10),
               InkWell(
                 onTap: _pickEarliest,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(ZRadius.field),
                 child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: tr(context, 'op.earliestAt'),

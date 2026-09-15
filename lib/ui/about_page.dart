@@ -59,7 +59,7 @@ class _AboutPageState extends State<AboutPage> {
           const SizedBox(height: 24),
           Center(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(ZRadius.large),
               child: Image.asset(
                 'assets/icon/icon.png',
                 width: 72,

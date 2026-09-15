@@ -307,7 +307,7 @@ class _SubagentDetailPageState extends State<SubagentDetailPage> {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: ZInk.tile(context),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(ZRadius.tile),
           ),
           child: Text(
             row['text'] as String? ?? '',
@@ -335,7 +335,7 @@ class _ReasoningStrip extends StatelessWidget {
       color: ZInk.tile(context),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         side: BorderSide(color: ZInk.hairline(context)),
       ),
       child: ExpansionTile(

@@ -136,8 +136,8 @@ class _DevicesPageState extends State<DevicesPage>
         session != null &&
         session.status != DeviceStatus.error) {
       if (!mounted) return;
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => _deviceThemeWrap(
+      await Navigator.of(context).push(zRoute(
+        (_) => _deviceThemeWrap(
           device,
           TaskListPage(
             store: widget.store,
@@ -169,8 +169,8 @@ class _DevicesPageState extends State<DevicesPage>
     await widget.store.touch(device.id);
     await widget.hub.suspend(device.id);
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => _deviceThemeWrap(
+    await Navigator.of(context).push(zRoute(
+      (_) => _deviceThemeWrap(
         device,
         RemotePage(device: device),
       ),
@@ -218,7 +218,7 @@ class _DevicesPageState extends State<DevicesPage>
 
   Future<void> _addByScan() async {
     final url = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const QrScanPage()),
+      zRoute((_) => const QrScanPage()),
     );
     if (url == null || url.trim().isEmpty) return;
     final device = await widget.store.addUrl(url);
@@ -332,8 +332,8 @@ class _DevicesPageState extends State<DevicesPage>
   }
 
   void _showScheduled() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ScheduledPage(
+    Navigator.of(context).push(zRoute(
+      (_) => ScheduledPage(
         devices: widget.store,
         hub: widget.hub,
         store: widget.scheduled,
@@ -386,8 +386,8 @@ class _DevicesPageState extends State<DevicesPage>
           IconButton(
             tooltip: tr(context, 'settings.title'),
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => SettingsPage(
+            onPressed: () => Navigator.of(context).push(zRoute(
+              (_) => SettingsPage(
                 store: widget.store,
                 theme: widget.theme,
                 ui: widget.ui,
@@ -425,17 +425,23 @@ class _DevicesPageState extends State<DevicesPage>
           }
           if (devices.isEmpty) return _emptyState(context);
           return RefreshIndicator(
-            onRefresh: () async => _syncConnections(),
+            onRefresh: _refresh,
             child: ReorderableListView.builder(
+              // Always scrollable: a one-device list must still accept the
+              // pull gesture for the refresh indicator.
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: devices.length,
+              // The row keeps no permanent drag handle (R8): reordering is a
+              // long press anywhere on the card, on every platform.
+              buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) {
                 return AnimatedBuilder(
                   animation: animation,
                   builder: (context, _) => Material(
                     elevation: 2 + animation.value * 4,
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(ZRadius.tile),
                     child: child,
                   ),
                 );
@@ -445,10 +451,13 @@ class _DevicesPageState extends State<DevicesPage>
               },
               itemBuilder: (context, i) {
                 final d = devices[i];
-                return Padding(
+                return ReorderableDelayedDragStartListener(
                   key: ValueKey(d.id),
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _deviceCard(d),
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _deviceCard(d),
+                  ),
                 );
               },
             ),
@@ -458,30 +467,57 @@ class _DevicesPageState extends State<DevicesPage>
     );
   }
 
+  /// Pull-to-refresh: re-read the stored device list, then re-sync the native
+  /// connections and the home widget with it.
+  Future<void> _refresh() async {
+    await widget.store.load();
+    if (!mounted) return;
+    _syncConnections();
+    _syncHomeWidget();
+  }
+
+  /// Empty state, kept inside a scrollable so the pull gesture still reaches
+  /// the refresh indicator when there is no device yet.
   Widget _emptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: ZColors.sky500.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(ZSpacing.emptyState),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: ZColors.sky500.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(ZRadius.field),
+                        ),
+                        child: const Icon(Icons.devices,
+                            size: 36, color: ZColors.sky500),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(tr(context, 'devices.empty.title'),
+                          style:
+                              ZType.title.copyWith(color: ZInk.solid(context))),
+                      const SizedBox(height: 8),
+                      Text(
+                        tr(context, 'devices.empty.body'),
+                        textAlign: TextAlign.center,
+                        style:
+                            ZType.body.copyWith(color: ZInk.faint(context)),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: const Icon(Icons.devices, size: 36, color: ZColors.sky500),
-            ),
-            const SizedBox(height: 20),
-            Text(tr(context, 'devices.empty.title'),
-                style: ZType.title.copyWith(color: ZInk.solid(context))),
-            const SizedBox(height: 8),
-            Text(
-              tr(context, 'devices.empty.body'),
-              textAlign: TextAlign.center,
-              style: ZType.body.copyWith(color: ZInk.faint(context)),
             ),
           ],
         ),
@@ -490,65 +526,106 @@ class _DevicesPageState extends State<DevicesPage>
   }
 
   Widget _deviceCard(Device device) {
-    final host = device.params?.source.host ?? '';
     final session = widget.hub.sessionOf(device.id);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _open(device),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: ListTile(
-            leading: _deviceLeading(context, session, device.pinned),
-            title: Row(
+          padding: ZListRow.padding,
+          child: ConstrainedBox(
+            constraints:
+                const BoxConstraints(minHeight: ZListRow.twoLineHeight),
+            child: Row(
               children: [
-                if (device.pinned) ...[
-                  Icon(Icons.push_pin, size: 14, color: ZInk.muted(context)),
-                  const SizedBox(width: 4),
-                ],
+                _deviceLeading(context, session, device.pinned),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    device.label,
-                    style: ZType.heading,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        device.label,
+                        style: ZType.heading,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      _deviceMeta(context, session, device),
+                    ],
                   ),
+                ),
+                IconButton(
+                  tooltip: tr(context, 'chat.more'),
+                  icon: Icon(Icons.more_vert,
+                      size: ZListRow.leadingIcon, color: ZInk.muted(context)),
+                  onPressed: () => _deviceActions(device),
                 ),
               ],
             ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _statusLine(context, session),
-                  if (host.isNotEmpty)
-                    Text(host,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Per-device actions, behind 「更多」: the row keeps no permanent
+  /// drag-handle/menu placeholder (R8) — reordering is the list's long-press
+  /// drag, the actions live here.
+  Future<void> _deviceActions(Device device) async {
+    final host = device.params?.source.host ?? '';
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    ZSpacing.screen, 0, ZSpacing.screen, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(device.label, style: ZType.heading),
+                    // The row no longer carries the host (R5): it lives in the
+                    // device's own detail surface.
+                    if (host.isNotEmpty)
+                      Text(
+                        host,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: ZType.caption.copyWith(
-                            color: ZInk.faint(context),
-                        )),
-                  Text(
-                    device.lastUsedAt != null
-                        ? trP(context, 'devices.lastUsed', [
-                            relativeTime(context, device.lastUsedAt!)
-                          ])
-                        : tr(context, 'devices.neverUsed'),
-                    style:
-                        ZType.caption.copyWith(color: ZInk.ghost(context)),
-                  ),
-                ],
-              ),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ReorderableDragStartListener(
-                  index: widget.store.devices.indexWhere((d) => d.id == device.id),
-                  child: Icon(Icons.drag_handle, color: ZInk.ghost(context)),
+                          color: ZInk.faint(context),
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                  ],
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (v) {
-                    switch (v) {
+              ),
+              for (final (value, key) in [
+                ('pin',
+                    device.pinned ? 'devices.menu.unpin' : 'devices.menu.pin'),
+                ('rename', 'devices.menu.rename'),
+                ('web', 'devices.menu.web'),
+                ('browser', 'devices.menu.browser'),
+                ('copy', 'devices.menu.copy'),
+                ('delete', 'devices.menu.delete'),
+              ])
+                ListTile(
+                  leading: Icon(_deviceActionIcon(value), size: 20),
+                  title: Text(
+                    tr(context, key),
+                    style: value == 'delete'
+                        ? ZType.body.copyWith(color: ZColors.danger)
+                        : ZType.body,
+                  ),
+                  onTap: () {
+                    Navigator.pop(c);
+                    switch (value) {
                       case 'pin':
                         widget.store.setPinned(device.id, !device.pinned);
                       case 'rename':
@@ -563,40 +640,23 @@ class _DevicesPageState extends State<DevicesPage>
                         _delete(device);
                     }
                   },
-                  itemBuilder: (c) => [
-                    PopupMenuItem(
-                        value: 'pin',
-                        child: Text(tr(
-                            context,
-                            device.pinned
-                                ? 'devices.menu.unpin'
-                                : 'devices.menu.pin'))),
-                    PopupMenuItem(
-                        value: 'rename',
-                        child: Text(tr(context, 'devices.menu.rename'))),
-                    PopupMenuItem(
-                        value: 'web', child: Text(tr(context, 'devices.menu.web'))),
-                    PopupMenuItem(
-                        value: 'browser',
-                        child: Text(tr(context, 'devices.menu.browser'))),
-                    PopupMenuItem(
-                        value: 'copy',
-                        child: Text(tr(context, 'devices.menu.copy'))),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(tr(context, 'devices.menu.delete'),
-                          style: TextStyle(
-                              color: Theme.of(c).colorScheme.error)),
-                    ),
-                  ],
                 ),
-              ],
-            ),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ),
     );
   }
+
+  static IconData _deviceActionIcon(String action) => switch (action) {
+        'pin' => Icons.push_pin_outlined,
+        'rename' => Icons.edit_outlined,
+        'web' => Icons.smartphone,
+        'browser' => Icons.open_in_browser,
+        'copy' => Icons.link,
+        _ => Icons.delete_outline,
+      };
 
   /// Device avatar with a live status dot and a running-task badge.
   Widget _deviceLeading(
@@ -612,15 +672,15 @@ class _DevicesPageState extends State<DevicesPage>
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: ZListRow.leadingSize,
+          height: ZListRow.leadingSize,
           decoration: BoxDecoration(
             color: ZColors.sky500.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(ZRadius.field),
           ),
           child: Icon(
             pinned ? Icons.push_pin_outlined : Icons.desktop_windows_outlined,
-            size: 22,
+            size: ZListRow.leadingIcon,
             color: ZColors.sky500,
           ),
         ),
@@ -646,7 +706,7 @@ class _DevicesPageState extends State<DevicesPage>
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
                 color: ZColors.sky500,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(ZRadius.field),
                 border: Border.all(
                     color: Theme.of(context).colorScheme.surface, width: 2),
               ),
@@ -663,8 +723,10 @@ class _DevicesPageState extends State<DevicesPage>
     );
   }
 
-  Widget _statusLine(BuildContext context, DeviceSession? session) {
-    final (text, color) = switch (session?.status) {
+  /// One meta line: `状态 · 上次使用…` (the host moved to the detail sheet).
+  Widget _deviceMeta(
+      BuildContext context, DeviceSession? session, Device device) {
+    final (status, color) = switch (session?.status) {
       DeviceStatus.connected => session != null && session.runningTaskCount > 0
           ? (trP(context, 'status.tasksRunning',
                 ['${session.runningTaskCount}']),
@@ -677,6 +739,23 @@ class _DevicesPageState extends State<DevicesPage>
           : (tr(context, 'status.error'), ZColors.danger),
       _ => (tr(context, 'status.offline'), ZInk.ghost(context)),
     };
-    return Text(text, style: ZType.sub.copyWith(color: color));
+    final lastUsed = device.lastUsedAt != null
+        ? trP(context, 'devices.lastUsed',
+            [relativeTime(context, device.lastUsedAt!)])
+        : tr(context, 'devices.neverUsed');
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+              text: status, style: ZType.caption.copyWith(color: color)),
+          TextSpan(
+            text: ' · $lastUsed',
+            style: ZType.caption.copyWith(color: ZInk.ghost(context)),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }

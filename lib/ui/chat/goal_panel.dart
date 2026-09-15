@@ -107,7 +107,7 @@ class _GoalPanelState extends State<GoalPanel> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Column(

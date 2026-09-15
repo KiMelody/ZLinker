@@ -106,8 +106,8 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     final context = _navigatorKey.currentContext;
     if (context == null || !context.mounted) return;
     if (_ui.nativeListEnabled && session != null) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => TaskListPage(
+      await Navigator.of(context).push(zRoute(
+        (_) => TaskListPage(
           store: _store,
           hub: _hub,
           device: device,
@@ -118,8 +118,8 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     }
     await _hub.suspend(device.id);
     if (!context.mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => RemotePage(device: device),
+    await Navigator.of(context).push(zRoute(
+      (_) => RemotePage(device: device),
     ));
     _hub.scheduleResume(device);
   }
@@ -144,8 +144,8 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     final context = _navigatorKey.currentContext;
     if (context == null || !context.mounted) return;
     if (session != null) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ChatPage(
+      await Navigator.of(context).push(zRoute(
+        (_) => ChatPage(
           gateway: session,
           sessionId: sessionId,
           title: title ?? device.label,
@@ -156,8 +156,8 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     }
     await _hub.suspend(device.id);
     if (!context.mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => RemotePage(
+    await Navigator.of(context).push(zRoute(
+      (_) => RemotePage(
         device: device,
         targetSessionId: sessionId,
         targetTitle: title,

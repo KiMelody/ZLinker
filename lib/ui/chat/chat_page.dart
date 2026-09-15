@@ -343,6 +343,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _send() async {
     final text = _inputController.text.trim();
     if ((text.isEmpty && _pendingFiles.isEmpty) || _sending) return;
+    HapticFeedback.lightImpact();
 
     // Slash commands (mirrors the web composer).
     if (text == '/compact' || text.startsWith('/compact ')) {
@@ -652,6 +653,7 @@ class _ChatPageState extends State<ChatPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (context) => _ModelModeSheet(
         gateway: widget.gateway,
         state: _state,
@@ -746,6 +748,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       showModalBottomSheet(
         context: context,
+        showDragHandle: true,
         builder: (context) =>
             _JsonSheet(title: tr(context, 'chat.plans'), data: plans),
       );
@@ -997,7 +1000,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                       decoration: BoxDecoration(
                         color: ZInk.tile(context),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(ZRadius.field),
                         border: Border.all(color: ZInk.hairline(context)),
                       ),
                       child: Row(
@@ -1311,7 +1314,7 @@ class _ChatPageState extends State<ChatPage> {
         color: ZColors.darkBackground.withValues(alpha: 0.92),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(ZSpacing.emptyState),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1767,8 +1770,10 @@ class _RowWidget extends StatelessWidget {
   void _showActions(BuildContext context) {
     final kind = row['kind'];
     if (kind != 'userInput' && kind != 'assistantText') return;
+    HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
+      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1891,6 +1896,7 @@ class _RowWidget extends StatelessWidget {
       if (!context.mounted) return;
       showModalBottomSheet(
         context: context,
+        showDragHandle: true,
         builder: (context) => _JsonSheet(
           title: tr(context, 'chat.action.fileChanges'),
           data: changes,
@@ -1984,10 +1990,10 @@ class _UserBubbleState extends State<_UserBubble> {
             decoration: BoxDecoration(
               color: ZColors.darkCard,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(4),
+                topLeft: Radius.circular(ZRadius.tile),
+                topRight: Radius.circular(ZRadius.tile),
+                bottomLeft: Radius.circular(ZRadius.tile),
+                bottomRight: Radius.circular(ZRadius.mini),
               ),
             ),
             child: Column(
@@ -2028,7 +2034,10 @@ class _UserBubbleState extends State<_UserBubble> {
                       visualDensity: VisualDensity.compact,
                       minimumSize: Size.zero,
                     ),
-                    onPressed: () => setState(() => _expanded = !_expanded),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      setState(() => _expanded = !_expanded);
+                    },
                     child: Text(
                       _expanded
                           ? tr(context, 'chat.collapse')
@@ -2185,7 +2194,7 @@ class _AttachmentViewState extends State<_AttachmentView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: ZInk.tile(context),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(ZRadius.field),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2228,7 +2237,7 @@ class _AttachmentViewState extends State<_AttachmentView> {
       // clear seam (user feedback: 6px read as "glued together").
       padding: const EdgeInsets.only(bottom: 12),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         child: Image.memory(_imageBytes!, width: 220, fit: BoxFit.cover),
       ),
     );
@@ -2382,25 +2391,27 @@ class _ReasoningTile extends StatelessWidget {
     return Padding(
       // Turn-part rhythm: reasoning/tool/subagent blocks need a seam
       // between neighbours (0px margins read as glued together).
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: ZTile.seam),
       child: Material(
         color: ZInk.tile(context),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ZRadius.tile),
           side: BorderSide(color: ZInk.hairline(context)),
         ),
         child: ExpansionTile(
           dense: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+          minTileHeight: ZTile.headHeight,
+          onExpansionChanged: (_) => HapticFeedback.lightImpact(),
+          tilePadding: ZTile.head,
           title: Row(
             children: [
               Icon(
                 Icons.psychology_outlined,
-                size: 14,
+                size: ZTile.iconSize,
                 color: streaming ? ZColors.sky400 : ZInk.faint(context),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 streaming
                     ? tr(context, 'chat.reasoning.thinking')
@@ -2411,7 +2422,7 @@ class _ReasoningTile extends StatelessWidget {
           ),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: ZTile.body,
               child: ZLinkerMarkdown(text, bodyStyle: ZType.sub),
             ),
           ],
@@ -2422,7 +2433,9 @@ class _ReasoningTile extends StatelessWidget {
 }
 
 /// Official-style tool summary: icon + "已写入 file +N" / "终端 · cmd" /
-/// "探索 · N 文件", expandable to input/output/diff.
+/// "探索 · N 文件", expandable to input/output/diff. The diff body lives
+/// INSIDE the expansion (collapsed by default — long agent dumps must not
+/// flood the chat); the live progress row stays always visible.
 class _ToolCallTile extends StatelessWidget {
   final Map<String, dynamic> row;
 
@@ -2506,52 +2519,69 @@ class _ToolCallTile extends StatelessWidget {
 
     return Padding(
       // Turn-part rhythm: seam between neighbouring blocks (see _ReasoningTile).
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: ZTile.seam),
       child: Material(
         color: ZInk.tile(context),
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZRadius.tile),
+          side: BorderSide(color: ZInk.hairline(context)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ExpansionTile(
-              dense: true,
-              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-              leading: Icon(icon, size: 15, color: color),
-              title: title,
-              subtitle: subtitle,
-              children: [
-                if (inputText.isNotEmpty)
-                  _kv(context, tr(context, 'chat.tool.input'), inputText),
-                if (outputText.isNotEmpty)
-                  _kv(context, tr(context, 'chat.tool.output'), outputText),
-                if (error is Map)
-                  _kv(
-                    context,
-                    tr(context, 'chat.tool.error'),
-                    '${error['code'] ?? ''} ${error['message'] ?? ''}',
-                  ),
-              ],
-            ),
-            if (progress is Map) _ProgressRow(progress: progress),
-            if (diff != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                child: DiffView(diff: diff),
-              ),
-            for (final image in images)
-              if (image is Map && image['base64'] is String)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      base64Decode(image['base64'] as String),
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+            // ListTile's defaults (40px leading box + 16px gap) would push the
+            // title 36px further right than the other two tiles' headers.
+            ListTileTheme.merge(
+              horizontalTitleGap: 8,
+              minLeadingWidth: ZTile.iconSize,
+              child: ExpansionTile(
+                dense: true,
+                minTileHeight: ZTile.headHeight,
+                onExpansionChanged: (_) => HapticFeedback.lightImpact(),
+                tilePadding: ZTile.head,
+                leading: Icon(icon, size: ZTile.iconSize, color: color),
+                title: title,
+                subtitle: subtitle,
+                children: [
+                  // File edits show only the diff: the raw input/output JSON
+                  // of a write/edit call is noise the official web omits too.
+                  if (diff == null && inputText.isNotEmpty)
+                    _kv(context, tr(context, 'chat.tool.input'), inputText),
+                  if (diff == null && outputText.isNotEmpty)
+                    _kv(context, tr(context, 'chat.tool.output'), outputText),
+                  if (error is Map)
+                    _kv(
+                      context,
+                      tr(context, 'chat.tool.error'),
+                      '${error['code'] ?? ''} ${error['message'] ?? ''}',
                     ),
-                  ),
-                ),
+                  // Diff/images live INSIDE the expansion so a collapsed
+                  // tool call shows only the "已写入 file +N" summary line.
+                  if (diff != null)
+                    Padding(
+                      padding: ZTile.body,
+                      child: DiffView(diff: diff),
+                    ),
+                  for (final image in images)
+                    if (image is Map && image['base64'] is String)
+                      Padding(
+                        padding: ZTile.body,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(ZRadius.field),
+                          child: Image.memory(
+                            base64Decode(image['base64'] as String),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+            // Live progress stays visible while collapsed.
+            if (progress is Map) _ProgressRow(progress: progress),
           ],
         ),
       ),
@@ -2792,7 +2822,7 @@ class _ToolCallTile extends StatelessWidget {
       display = const JsonEncoder.withIndent('  ').convert(decoded);
     } catch (_) {}
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: ZTile.body,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2806,7 +2836,7 @@ class _ToolCallTile extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: ZInk.codeBlockBg(context),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(ZRadius.field),
             ),
             child: SelectableText(
               display.length > 4000
@@ -2834,7 +2864,7 @@ class _ProgressRow extends StatelessWidget {
     final bytes = (progress['bytes'] as num?)?.toInt() ?? 0;
     final preview = progress['previewLine'] as String? ?? '';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: ZTile.body,
       child: Row(
         children: [
           const SizedBox(
@@ -2901,11 +2931,22 @@ class _TurnHeader extends StatelessWidget {
             ),
           if (hasChanges)
             InkWell(
-              onTap: onToggle,
-              child: Icon(
-                expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                size: 16,
-                color: ZInk.ghost(context),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onToggle();
+              },
+              child: SizedBox(
+                width: zTouchWidth,
+                height: zTouchHeight,
+                child: Center(
+                  child: Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: ZInk.ghost(context),
+                  ),
+                ),
               ),
             ),
           const Spacer(),
@@ -2950,7 +2991,7 @@ class _FileChangesBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Row(
@@ -3182,7 +3223,7 @@ class _TimelineMarkerWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(ZRadius.pill),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -3229,38 +3270,44 @@ class _SubagentTile extends StatelessWidget {
         running: row['status'] == 'running',
       ),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: ZTile.seam),
+        padding: const EdgeInsets.all(ZTile.headPadding),
         decoration: BoxDecoration(
           color: ZInk.tile(context),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ZRadius.tile),
+          border: Border.all(color: ZInk.hairline(context)),
         ),
-        child: Row(
-          children: [
-            Icon(Icons.smart_toy_outlined,
-                size: 15, color: ZInk.muted(context)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    trP(context, 'chat.subagent', [
-                      '${row['subagentType'] ?? ''}',
-                    ]),
-                    style: ZType.sub.copyWith(color: ZInk.soft(context)),
-                  ),
-                  Text(
-                    '${row['status'] ?? ''}  ${row['summaryText'] ?? ''}',
-                    style: ZType.caption.copyWith(color: ZInk.faint(context)),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: ZTile.headHeight),
+          child: Row(
+            children: [
+              Icon(Icons.smart_toy_outlined,
+                  size: ZTile.iconSize, color: ZInk.muted(context)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      trP(context, 'chat.subagent', [
+                        '${row['subagentType'] ?? ''}',
+                      ]),
+                      style: ZType.sub.copyWith(color: ZInk.soft(context)),
+                    ),
+                    Text(
+                      '${row['status'] ?? ''}  ${row['summaryText'] ?? ''}',
+                      style: ZType.caption.copyWith(color: ZInk.faint(context)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, size: 16, color: ZInk.ghost(context)),
-          ],
+              Icon(Icons.chevron_right,
+                  size: ZTile.iconSize, color: ZInk.ghost(context)),
+            ],
+          ),
         ),
       ),
     );
@@ -3306,7 +3353,7 @@ class _GoalBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: ZColors.success.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         border: Border.all(color: ZColors.success.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -3419,7 +3466,7 @@ class _BackgroundWorksBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -3513,8 +3560,8 @@ void _openSubagentDetail(
   final sid = childSessionId ?? '';
   if (sid.isEmpty) return;
   Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => SubagentDetailPage(
+    zRoute(
+      (_) => SubagentDetailPage(
         gateway: gateway,
         childSessionId: sid,
         title: title,
@@ -3541,21 +3588,24 @@ class _QueueBar extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 4, 14, 0),
       padding: const EdgeInsets.all(10),
+      // Official web: the queue is a neutral sub-surface inside the composer
+      // area — no accent tint. ZInk.tile's contract names the queue directly.
       decoration: BoxDecoration(
-        color: ZColors.sky500.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ZColors.sky500.withValues(alpha: 0.25)),
+        color: ZInk.tile(context),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
+        border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.queue_outlined, size: 14, color: ZColors.sky500),
+              Icon(Icons.queue_outlined,
+                  size: 14, color: ZInk.muted(context)),
               const SizedBox(width: 6),
               Text(
                 trP(context, 'chat.queue.count', ['${items.length}']),
-                style: ZType.sub.copyWith(color: ZColors.sky500),
+                style: ZType.sub.copyWith(color: ZInk.muted(context)),
               ),
               const Spacer(),
               InkWell(
@@ -3576,94 +3626,118 @@ class _QueueBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          for (var i = 0; i < items.length; i++)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${items[i]['text'] ?? ''}',
-                      style: ZType.sub.copyWith(color: ZInk.soft(context)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          // Official web parity: each queued message is its own pill row with
+          // a drag handle (⋮⋮) for reordering — no up/down arrows.
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            buildDefaultDragHandles: false,
+            itemCount: items.length,
+            onReorderItem: (oldIndex, newIndex) {
+              if (newIndex == oldIndex) return;
+              // onReorderItem's newIndex is the post-removal insert position;
+              // map it onto the web's beforeQueueItemId semantics.
+              final before = newIndex > oldIndex ? newIndex + 1 : newIndex;
+              _reorder(context, sessionId, items, oldIndex,
+                  before >= items.length ? null : before);
+            },
+            itemBuilder: (context, i) {
+              return Padding(
+                key: ValueKey('${items[i]['queueItemId']}'),
+                padding: EdgeInsets.only(bottom: i == items.length - 1 ? 0 : 4),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? ZColors.darkCard
+                        : ZColors.lightCard,
+                    borderRadius: BorderRadius.circular(ZRadius.field),
+                    border: Border.all(color: ZInk.hairline(context)),
                   ),
-                  _QueueAction(
-                    icon: Icons.arrow_upward,
-                    tooltip: tr(context, 'chat.queue.moveUp'),
-                    enabled: i > 0,
-                    onTap: () => _reorder(context, sessionId, items, i, i - 1),
-                  ),
-                  _QueueAction(
-                    icon: Icons.arrow_downward,
-                    tooltip: tr(context, 'chat.queue.moveDown'),
-                    enabled: i < items.length - 1,
-                    onTap: () => _reorder(context, sessionId, items, i,
-                        i + 2 >= items.length ? null : i + 2),
-                  ),
-                  _QueueAction(
-                    icon: Icons.play_arrow,
-                    tooltip: tr(context, 'chat.queue.sendNow'),
-                    onTap: () {
-                      final id = '${items[i]['queueItemId']}';
-                      state.optimisticRemoveQueueItem(id);
-                      gateway.sendQueuedNow(sessionId, id);
-                    },
-                  ),
-                  _QueueAction(
-                    icon: Icons.edit_outlined,
-                    tooltip: tr(context, 'chat.queue.edit'),
-                    onTap: () => _edit(context, sessionId, items[i]),
-                  ),
-                  _QueueAction(
-                    icon: Icons.close,
-                    tooltip: tr(context, 'devices.menu.delete'),
-                    onTap: () async {
-                      final id = '${items[i]['queueItemId']}';
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        useRootNavigator: false,
-                        builder: (context) => AlertDialog(
-                          title: Text(tr(context, 'chat.queue.delete.title')),
-                          content: Text(
-                            '${items[i]['text'] ?? ''}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: Text(tr(context, 'devices.add.cancel')),
-                            ),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: ZColors.danger,
-                              ),
-                              onPressed: () => Navigator.pop(context, true),
-                              child: Text(
-                                tr(context, 'devices.delete.confirm'),
-                              ),
-                            ),
-                          ],
+                  child: Row(
+                    children: [
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: SizedBox(
+                          width: 36,
+                          height: 44,
+                          child: Icon(Icons.drag_indicator,
+                              size: 18, color: ZInk.ghost(context)),
                         ),
-                      );
-                      if (confirmed != true) return;
-                      state.optimisticRemoveQueueItem(id);
-                      gateway.deleteQueueItem(sessionId, id);
-                    },
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${items[i]['text'] ?? ''}',
+                          style: ZType.sub.copyWith(color: ZInk.soft(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      _QueueAction(
+                        icon: Icons.play_arrow,
+                        tooltip: tr(context, 'chat.queue.sendNow'),
+                        onTap: () {
+                          final id = '${items[i]['queueItemId']}';
+                          state.optimisticRemoveQueueItem(id);
+                          gateway.sendQueuedNow(sessionId, id);
+                        },
+                      ),
+                      _QueueAction(
+                        icon: Icons.edit_outlined,
+                        tooltip: tr(context, 'chat.queue.edit'),
+                        onTap: () => _edit(context, sessionId, items[i]),
+                      ),
+                      _QueueAction(
+                        icon: Icons.close,
+                        tooltip: tr(context, 'devices.menu.delete'),
+                        onTap: () async {
+                          final id = '${items[i]['queueItemId']}';
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            useRootNavigator: false,
+                            builder: (context) => AlertDialog(
+                              title: Text(tr(context, 'chat.queue.delete.title')),
+                              content: Text(
+                                '${items[i]['text'] ?? ''}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: Text(tr(context, 'devices.add.cancel')),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: ZColors.danger,
+                                  ),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: Text(
+                                    tr(context, 'devices.delete.confirm'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed != true) return;
+                          state.optimisticRemoveQueueItem(id);
+                          gateway.deleteQueueItem(sessionId, id);
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
   /// Web drag-to-reorder parity: the same `reorderQueueItem
-  /// {queueItemId, beforeQueueItemId|null}` command, driven by move
-  /// buttons (rows are too narrow for a drag handle on phones).
+  /// {queueItemId, beforeQueueItemId|null}` command, driven by the
+  /// drag handle on each queued row.
   /// [targetIndex] is the index the item should occupy after the move;
   /// `null` moves it to the end.
   void _reorder(
@@ -3783,40 +3857,46 @@ class _ToolGroupCardState extends State<_ToolGroupCard> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(ZRadius.field),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(Icons.terminal,
-                      size: 14, color: ZInk.muted(context)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${tr(context, 'chat.tool.group.terminal')} · $bits'
-                      '${lastCmd.isEmpty ? '' : '  ·  $lastCmd'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.sub.copyWith(color: ZInk.soft(context)),
+            borderRadius: BorderRadius.circular(ZRadius.field),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _expanded = !_expanded);
+            },
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: zTouchHeight),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.terminal,
+                        size: 14, color: ZInk.muted(context)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${tr(context, 'chat.tool.group.terminal')} · $bits'
+                        '${lastCmd.isEmpty ? '' : '  ·  $lastCmd'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.sub.copyWith(color: ZInk.soft(context)),
+                      ),
                     ),
-                  ),
-                  Icon(
-                    _expanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: ZInk.ghost(context),
-                  ),
-                ],
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: ZInk.ghost(context),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -3847,13 +3927,11 @@ class _QueueAction extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
-  final bool enabled;
 
   const _QueueAction({
     required this.icon,
     required this.tooltip,
     required this.onTap,
-    this.enabled = true,
   });
 
   @override
@@ -3862,10 +3940,10 @@ class _QueueAction extends StatelessWidget {
       icon: Icon(
         icon,
         size: 16,
-        color: enabled ? ZInk.muted(context) : ZInk.ghost(context),
+        color: ZInk.muted(context),
       ),
       tooltip: tooltip,
-      onPressed: enabled ? onTap : null,
+      onPressed: onTap,
       visualDensity: VisualDensity.compact,
     );
   }
@@ -3889,7 +3967,7 @@ class _PendingFilesBar extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: ZInk.tile(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4034,7 +4112,7 @@ class _InteractionCardState extends State<_InteractionCard> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ZColors.warning.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         border: Border.all(color: ZColors.warning.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -4135,7 +4213,7 @@ class _InteractionCardState extends State<_InteractionCard> {
               child: Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(ZRadius.mini),
                   onTap: _busy ? null : () => widget.onSnooze!(),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -4379,7 +4457,8 @@ class _ModelModeSheet extends StatelessWidget {
 
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(
+            horizontal: ZSpacing.screen, vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -4768,7 +4847,8 @@ class _UsageSheet extends StatelessWidget {
             ),
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                padding: const EdgeInsets.fromLTRB(
+                    ZSpacing.screen, 4, ZSpacing.screen, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4950,7 +5030,7 @@ class _UsageSheet extends StatelessWidget {
                             horizontal: 10, vertical: 3),
                         decoration: BoxDecoration(
                           color: ZColors.usageGreen.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(ZRadius.field),
                         ),
                         child: Text(
                           tr(context, 'chat.usage.limit.fiveHour'),
@@ -4980,7 +5060,7 @@ class _UsageSheet extends StatelessWidget {
                       horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
                     color: ZInk.hairline(context),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(ZRadius.field),
                     border: Border.all(
                       color: ZColors.usageGreen.withValues(alpha: 0.35),
                     ),
@@ -5008,7 +5088,7 @@ class _UsageSheet extends StatelessWidget {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           textStyle: ZType.sub,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(ZRadius.field),
                           ),
                         ),
                         child: Text(tr(context, 'chat.quota.useReset')),
@@ -5278,7 +5358,8 @@ class _JsonSheet extends StatelessWidget {
     const encoder = JsonEncoder.withIndent('  ');
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(
+            horizontal: ZSpacing.screen, vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -5349,7 +5430,7 @@ class _SlashCommandBar extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: ZColors.darkCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ZRadius.tile),
         ),
         child: Text(
           tr(context, 'chat.slash.empty'),
@@ -5362,7 +5443,7 @@ class _SlashCommandBar extends StatelessWidget {
       constraints: const BoxConstraints(maxHeight: 260),
       decoration: BoxDecoration(
         color: ZColors.darkCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         border: Border.all(color: ZInk.hairline(context)),
       ),
       child: ListView(
@@ -5414,7 +5495,8 @@ class _SkillsPickerSheet extends StatelessWidget {
     final list = skills.where((s) => s.enabled).toList();
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        padding: const EdgeInsets.fromLTRB(
+            ZSpacing.screen, 4, ZSpacing.screen, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -5631,6 +5713,9 @@ class _InputBarState extends State<_InputBar> {
   @override
   Widget build(BuildContext context) {
     final running = state?.isRunning ?? false;
+    // Official web swaps the hint once messages are queued, so typing more
+    // keeps appending to the queue instead of looking like a fresh message.
+    final queued = state?.queueItems.isNotEmpty ?? false;
     // Official composer: icon-only buttons below sm (640), icon+label above.
     final wide = MediaQuery.sizeOf(context).width >= 640;
     return SafeArea(
@@ -5640,7 +5725,7 @@ class _InputBarState extends State<_InputBar> {
           padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
           decoration: BoxDecoration(
             color: ZColors.darkCard,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(ZRadius.tile),
             border: Border.all(color: ZInk.hairline(context)),
           ),
           child: Column(
@@ -5652,7 +5737,10 @@ class _InputBarState extends State<_InputBar> {
                 maxLines: 6,
                 style: ZType.body.copyWith(color: ZInk.solid(context)),
                 decoration: InputDecoration(
-                  hintText: tr(context, 'chat.input.hint'),
+                  hintText: tr(
+                    context,
+                    queued ? 'chat.input.hint.queued' : 'chat.input.hint',
+                  ),
                   hintStyle: TextStyle(color: ZInk.ghost(context)),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -5700,13 +5788,15 @@ class _InputBarState extends State<_InputBar> {
                       showLabel: wide,
                     ),
                   const SizedBox(width: 4),
-                  running
-                      ? _StopButton(onStop: () => _stop(context))
-                      : _SendButton(
-                          enabled: _hasInput && !sending,
-                          sending: sending,
-                          onSend: onSend,
-                        ),
+                  // Official web keeps the composer sendable while a turn
+                  // runs — follow-ups queue mid-turn — with stop appearing
+                  // at the far right.
+                  _SendButton(
+                    enabled: _hasInput && !sending,
+                    sending: sending,
+                    onSend: onSend,
+                  ),
+                  if (running) _StopButton(onStop: () => _stop(context)),
                 ],
               ),
             ],
@@ -5813,7 +5903,7 @@ class _ControlChip extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!showLabel) {
       return InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(ZRadius.tile),
         onTap: onTap,
         child: SizedBox(
           width: 28,
@@ -5823,13 +5913,13 @@ class _ControlChip extends StatelessWidget {
       );
     }
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(ZRadius.tile),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: ZInk.tile(context),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(ZRadius.tile),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -5939,29 +6029,43 @@ class _SendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: enabled ? ZColors.sky500 : ZColors.sky500.withValues(alpha: 0.4),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        onPressed: enabled ? onSend : null,
-        icon: sending
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Icon(
-                Icons.arrow_upward,
-                size: 18,
-                color: enabled
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.7),
-              ),
+    // Official web: ~30px squircle (ZRadius.mini) with the arrow glyph.
+    // The InkWell spans 48px so the touch target stays ≥48.
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ZRadius.mini),
+        onTap: enabled ? onSend : null,
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color:
+                  enabled ? ZColors.sky500 : ZColors.sky500.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(ZRadius.mini),
+            ),
+            child: Center(
+              child: sending
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      Icons.arrow_upward,
+                      size: 18,
+                      color: enabled
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.7),
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -5974,15 +6078,29 @@ class _StopButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: ZColors.danger.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        tooltip: tr(context, 'tasks.stop'),
-        onPressed: onStop,
-        icon: const Icon(Icons.stop, color: ZColors.danger, size: 20),
+    // Same squircle as the send button (they swap in place).
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: Tooltip(
+        message: tr(context, 'tasks.stop'),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZRadius.mini),
+          onTap: onStop,
+          child: Center(
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: ZColors.danger.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(ZRadius.mini),
+              ),
+              child: Center(
+                child: Icon(Icons.stop, color: ZColors.danger, size: 20),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
