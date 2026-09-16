@@ -97,8 +97,8 @@
 | C6 renameSession | 信封命令 `renameSession {title}` | 走 TaskCommandsPort.renameTask 探测(zcode-task 通道;信封命令是另一条路径) | 部分(功能有,通道不同,需验证桌面两侧都支持) | P1 | |
 | C7 rewind 预览 | `conversationFileRewindPreviewV4` 预检流程 UI(safe/unsafe/ignored + 不可撤销原因) | 协议层已定义(conversation.dart:476),UI 只有确认对话框无预览 | 部分 | **P0** | |
 | C8 elicitation 自由表单 | MCP OAuth 等表单(customAnswer/submit/倒计时) | questions 表单(单选/多选/自由文本)已有;elicitation 专属形态待核 | 部分(先验收再定) | P1 | |
-| C9 额度警告横幅 | `chat.quota.*`(quota_exhausted/providerLimited 等 + upgrade/switchModel 动作) | 无 | 缺失 | P1 | |
-| C10 planUsage 面板 | `chat.planUsage.*`(5 小时池/每周额度/会话上下文) | 「用量 sheet」有(调 getTaskTokenUsage 类?),quota 维度待核 | 部分(待核) | P1 | |
+| C9 额度警告横幅 | `chat.quota.*`(quota_exhausted/providerLimited 等 + upgrade/switchModel 动作) | 轮询快照驱动警告条(remaining.percentage>=100/count==0/quota.limits 触顶)+ 切换模型/查看用量动作;无推送通路,降级为「打开即查+手动刷新」 | 部分(轮询降级;web 另有 error 行驱动) | P1 | 🔨 |
+| C10 planUsage 面板 | `chat.planUsage.*`(5 小时池/每周额度/会话上下文) | 输入区额度 pill(剩余 N · HH:mm 重置,>80% 警告色)+ 更多菜单用量 sheet;5 小时池/每周字段未确认未渲染 ⚠️ | 部分 | P1 | 🔨 |
 | C11 contextUsage 详情 | 容量+缓存命中率+来源分解+compress | 上下文圆环有;分解无;compress 走 /compact 快捷已通 | 部分 | P2 | |
 | C12 Hook 评审 | requestWorkspaceHookReview/respondWorkspaceHookReview/toggleReviewItem/revokeTrust + 待审横幅 | 无 | 缺失 | P2(桌面安全流,远控低频) | |
 | C13 @提及上下文 | files/skills/subagents/sessions 分类选择器 | 无(仅附件+技能选择器) | 缺失 | P2 | |
@@ -120,9 +120,10 @@
 |---|---|---|---|---|---|
 | U1 应用用量图 | `getAppUsageSnapshot({range:'7d'|'30d'|'90d'|'all', timeZone})` → dailyModelUsage 趋势图+模型分布 | 无(只调 entitlement) | 缺失 | **P0**(本页核心缺口) | |
 | U2 套餐用量图 | codingPlan 用量(指标 credits/usage、主体 model/tool、range today/7d/30d/custom、工具调用分布) | 无 | 缺失 | P1 | |
-| U3 权益面板字段 | 有效套餐/等级/到期/下次重置/5 小时池/每周剩余/工具调用/ZCode MCP/并发优先级 | 套餐名/等级/剩余额度/quota.limits/订阅详情已有;5 小时池/每周/MCP/并发优先级字段待核 | 部分 | P1 | |
-| U4 错误态文案 | `usage.error.*`(未找到权益/无法读取额度/无法读取统计+重试) | 加载/错误/刷新已有;文案分域未对齐 | 部分 | P2 | |
-| U5 迷你额度(侧栏概念) | sidebar.usage.plan.* 8 态 + 刷新 | 无侧栏;可作为页头摘要卡 | 缺失 | P2 | |
+| U3 权益面板字段 | 有效套餐/等级/到期/下次重置/5 小时池/每周剩余/工具调用/ZCode MCP/并发优先级 | 套餐名/等级/剩余额度/quota.limits/订阅详情已有;新增五态状态分支(notConfigured/noPlan/loginRequired/error+retry);5 小时池/每周/MCP/并发优先级字段待桌面 entitlement 恢复后复测,不猜字段名 ⚠️ | 部分 | P1 | 🔨 |
+| U4 错误态文案 | `usage.error.*`(未找到权益/无法读取额度/无法读取统计+重试) | 加载/错误/刷新已有;状态分支文案对齐 usageRpc.*(notConfigured/noPlan/loginRequired)+重试 | 部分 | P2 | 🔨 |
+| U5 迷你额度(侧栏概念) | sidebar.usage.plan.* 8 态 + 刷新 | 无侧栏,聊天页也无常驻摘要(`_QuotaPill` 于 09-15 语义修正任务移除);套餐用量集中在用量页,入口由警告条「查看用量」承担 | 缺失(常驻入口移除) | P2 | 🔨 |
+| U6 重置机会(套餐重置券) | usage-stats 通道 4 方法族:`getCodingPlanResetStatus`(只读快照)+`useCodingPlanReset`(手动重置,`FIVE_HOUR`/`WEEK` 两池)+`requestCodingPlanResetOpportunity`/`markCodingPlanResetHistoryRead`(官方 web 侧栏完整状态机:入口+确认弹窗+乐观 processing+UUID 幂等) | 用量页 entitlement ok 态卡片下「重置机会」卡(两池行 count/最早过期/重置按钮,processing 转圈,count==0 显示暂无,pools 无数据显示禁用态文案)+聊天页触顶警告条「使用重置券」动作(确认框→乐观 use→成功 toast+entitlement force 刷新即时翻新,失败回滚+toast);控制器 10s staleness 缓存+force 绕过+失败保旧值;`requestCodingPlanResetOpportunity`/`markCodingPlanResetHistoryRead` 按 PRD R3 移出范围未实现 ⚠️ | 部分(代码完成;桌面 provider 域中断期 `no_bigmodel_api_key`,真机未验收) | P1 | 🔨 |
 
 ## M. model_providers_page(模型供应商)
 
@@ -209,3 +210,21 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - ⚠️ 已知差异:works 行不显示已运行时长(GoalPanel running tile 内已有 `_AgentElapsed`,works 行 MVP 未复制);详情页 running 标记为入口时快照,不随父会话 works 列表实时翻转;子会话内若出现 userInput 行按只读纯文本渲染(probe 窗口未捕获,防御处理)。
 - ⚠️ 待核:mailbox 行(「来自 {sessionId} 的新消息」)两次探测样本均未出现,row kind 与结构未知(PRD Open Question);子会话详情页按默认轻量分隔渲染,待真实样本复测后跟进。
 - 测试:conversation_test +2(subagentsInfo);chat_page_test +3(goal=null 可见/summaryText 流式更新/点击进详情);subagent_detail_page_test 新建 +3(只读时间线/loadOlder 调 rowsRange/停止确认)。
+
+## 套餐剩余批次实现记录(2026-09-14,任务 09-13-quota-remaining,代码完成,待桌面 entitlement 恢复后复测)
+
+- **数据契约**:全部来自 live probe(`.trellis/tasks/09-13-quota-remaining/research/entitlement-probe.md`):会话快照顶层 20 key 无任何 quota/planUsage 推送 → C9 警告只能轮询 `usage-stats.getEntitlementSnapshot`;本机桌面返回 `not_configured`(provider/remaining/subscription/quota 全 null),即 entitlement 子系统状态与会话鉴权是两回事。
+- **新增 state 层**:`lib/state/entitlement_poller.dart` — EntitlementPoller(ValueNotifier<EntitlementView>,phase: loading/ok/notConfigured/noPlan/loginRequired/error):5 分钟 staleness 缓存、force 绕过、并发去重、失败保旧值不清空(错误永不走缓存);`exhausted` 投影(仅 `quota.limits` 中 token 类 `TOKENS_LIMIT`/`CREDIT_LIMIT` 触顶;顶层 `remaining` 是月度 MCP `TIME_LIMIT` 的镜像、不参与——09-15 语义修正)为警告条唯一判据。DeviceSession 惰性持有(会话生命周期单例,dispose 关闭);ChatGateway 增转发方法 `entitlementSnapshot({bool force})`。
+- **U3/U4**:用量页按 phase 五分支渲染(ok 态维持现有卡片不动;notConfigured/noPlan/loginRequired/error → 文案+重试,复用 tasks.retry);打开走缓存,刷新按钮/下拉 force。
+- **U5/C10**:聊天页输入区 control row 曾常驻 `_QuotaPill`(剩余 N · HH:mm 重置),09-15 语义修正任务移除——它读的是 `remaining`(月度 MCP `TIME_LIMIT` 镜像),在 token 仅 51% 时就显示警告色「0」,误导性强;官方 composer 也无常驻 quota pill。用量入口由警告条「查看用量」(ChatPage.onOpenUsage 回调注入)与更多菜单「用量统计」承担。
+- **C9**:警告条 = poller ok 且 exhausted(danger 色卡),动作 切换模型(复用 _showModelSheet)+ 查看用量;页面打开时拉一次,无后台常驻定时器(R4 本地通知联动移出范围,待有真实推送数据源再议)。渲染字段仅限已确认结构(remaining count/percentage/nextResetTime、quota.limits percentage),5 小时池/每周等未确认字段一律未渲染。
+- 测试:entitlement_poller_test 新建 +8(staleness/force/失败保旧值/并发去重/五 phase 映射/exhausted 判据,not_configured 录制响应作 fixture);device_usage_page_test 新建 +7(五态+重试+loading);chat_page_test +4(pill ok/隐藏、警告条出现/动作、下一次 ok 解除)。全量 303 绿,analyze 0 警告(10 条既有 Radio info 为基线)。
+- ⚠️ 待复测:用户在桌面 ZCode 打开一次用量页后复跑 audit 探针,确认 entitlement 恢复与真实 ok 返回结构,再补富字段渲染与真机截图验收(judge)。
+
+## 重置机会批次实现记录(2026-09-14,任务 09-14-quota-reset-opportunity,代码完成,真机验收推迟)
+
+- **数据契约**:全部来自官方 web 远控 bundle 逆向(`.trellis/tasks/09-14-quota-reset-opportunity/research/quota-reset-bundle-analysis.md`):usage-stats 通道 `getCodingPlanResetStatus`/`useCodingPlanReset`,快照渲染白名单仅 `availableFiveHourResets`/`availableWeekResets` 的 `expireAt`;官方乐观状态机 available→processing→completed,UUID 幂等键,成功后 force 重拉 status + force 刷新 entitlement。
+- **新增 state 层**:`lib/state/quota_reset.dart` — `parseQuotaResetPools`(防御性纯函数,缺字段/类型错静默降级 count=0,过期条目按 bundle WF 语义排除)+ `QuotaResetController`(10s staleness 缓存、force 绕过、失败保旧值且错误不进缓存、乐观 processing、幂等键手写生成、成功链 force 确认 + entitlement force 刷新、失败回滚置 error);scope(`preferredProviderId`)由 UI 从 entitlement ok 快照 provider.id 防御性读出后 `updateScope` 注入,缺失=功能禁用态(不发请求、显示禁用文案、不弹错)。`ChatGateway` 增 `quotaResetStatus`/`useQuotaReset`/`quotaResetController`;DeviceSession 惰性持有控制器 + dispose 关闭,RPC 形态 `('usage-stats','getCodingPlanResetStatus',[scope])` / `('usage-stats','useCodingPlanReset',[{...scope,idempotencyKey,resetType}])`。
+- **U6**:用量页 ok 态卡片列表末尾「重置机会」卡(两池行 count/最早过期/重置按钮、processing 转圈、暂无文案、禁用态文案、确认框、成功/失败 SnackBar、成功后页面 force 刷新);C9 增量:触顶警告条在任一池 count>0 时追加「使用重置券」(优先 5 小时池),确认→use→entitlement 重拉使警告条即时翻新。i18n `usage.reset.*` + `chat.quota.useReset` 双语。
+- 测试:quota_reset_test 新建 +8(解析畸形输入/过期过滤/缓存与 force/成功链/失败回滚/scope 禁用);device_usage_page_test +4(两池渲染/无 provider id 禁用态/取消不发 RPC/确认成功链+降级不崩);chat_page_test +3(无机会不出现/取消不消耗/确认后警告条翻新)。全量绿。
+- ⚠️ **TODO 真机复测**(桌面 provider 域修复后):复跑 `test/protocol/live_reset_opportunity_probe_test.dart`(env `ZLINKER_PROBE_URL` 驱动,未设置自动跳过)确认 ①status 快照真实字段与白名单一致 ②`useCodingPlanReset` 在真实通道的成功/失败形状 ③entitlement provider 是否携带 `id` 字段(scope 注入依据)。复测通过后再做真机手动验收(写操作消耗真实重置券)。
