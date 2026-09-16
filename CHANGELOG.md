@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-09-15
+
+### Added
+
+- **Official-web style alignment for the chat composer and message flow**:
+  markdown code blocks and tool-call diffs collapse by default (file edits
+  expand to the diff only — no raw parameter/output JSON), queued messages
+  reorder via an official-style drag handle on neutral pill cards, and the
+  send button stays available while a turn is running so follow-ups can be
+  queued mid-run.
+- **Entitlement & quota panels**: five-state entitlement polling
+  (EntitlementPoller), quota-reset opportunities with optimistic state
+  machine, and an official-style usage sheet with semantic limit columns.
+- **Context-usage panel** aligned with the official sheet (capacity bars,
+  cache-hit rate, source breakdown) and a read-only sub-agent detail page
+  with live progress rows.
+- Design-token system: NotoSansSC subset bundles, a 7-step `ZType` scale,
+  `ZRadius`/`ZTile`/`ZListRow` geometry contracts, and swipe actions with
+  haptic feedback and unified transitions.
+
+### Changed
+
+- Composer geometry matches the official web client (panel radius 12,
+  squircle send/stop buttons) — measured pixel-for-pixel from official
+  screenshots.
+- Queue bar is a neutral sub-surface (no accent tint) with the official
+  queued-input placeholder 「继续输入以排队后续修改」.
+
+### Fixed
+
+- Sub-agent detail subscription no longer hangs forever — timeout fallback
+  plus watchdog coverage for blind windows.
+- Turn-block spacing and auto-scroll rhythm; background refreshes no
+  longer yank the view to the bottom.
+
 ## [1.7.0] - 2026-08-26
 
 ### Changed

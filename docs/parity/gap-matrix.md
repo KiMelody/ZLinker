@@ -89,7 +89,7 @@
 
 | 能力项 | 网页版行为 | ZLinker 现状 | 等级 | 优先级 | 验收 |
 |---|---|---|---|---|---|
-| C1 队列排序 | `reorderQueueItem {queueItemId, beforeQueueItemId\|null}`(可拖拽) | 队列条有 sendNow/edit/delete/autoDrain,**无 reorder**(信封命令也缺) | 缺失 | **P0** | |
+| C1 队列排序 | `reorderQueueItem {queueItemId, beforeQueueItemId\|null}`(可拖拽) | 每条独立卡片 + drag_indicator 把手拖拽排序(onReorderItem→同一协议命令);另有 sendNow/edit/delete/autoDrain 与队列态 placeholder「继续输入以排队后续修改」 | 一致 | — | ✅ |
 | C2 交互自动继续 | `snoozeInteractionAutoResolution {interactionId}`(对应桌面「提问自动继续」5 分钟) | 无 | 缺失 | **P0** | |
 | C3 followup 语义 | `setFollowupMode {mode:'queue'|'guide'}` + sendText `requestedDelivery:'startNow'|'queue'|'guide'` | 有 inputRouting=choice 时「清空/保留队列」弹窗 + heldQueueDisposition/expectedHeldQueueItemIds 已传;`setFollowupMode`/`requestedDelivery` 未用 | 部分 | **P0** | |
 | C4 后台工作取消 | `cancelBackgroundWork {workId}` | 后台横幅有展示,无取消 | 部分 | P1 | |
@@ -108,7 +108,7 @@
 | C17 编辑重发 workspaceMode | `editUserQuery {workspaceMode:'preserve'|'rewind'}` + 重置文件弹窗 | 编辑重发有;workspaceMode 参数与「对话+文件重置」弹窗待核 | 部分(待核) | P1 | |
 | C18 错误呈现 | chat.error.*(connectionLost/processExited/复制 TraceID/反馈带现场) | 订阅失败红条/重连黄条/被接管遮罩有;TraceID 复制/反馈带现场无 | 部分 | P1 | |
 | C19 思考等级档位 | 9 档 off/noThink/on/low/medium/high/xhigh/max | 思考等级 chip 有(档位集合待核对) | 部分(待核) | P1 | |
-| C20 消息流核心 | turn 分组/加载更早/时间分隔/Markdown/工具卡/Diff/反馈/复制 | 已有(前轮对齐成果) | 一致 | — | |
+| C20 消息流核心 | turn 分组/加载更早/时间分隔/Markdown/工具卡/Diff/反馈/复制 | 已有(前轮对齐成果);markdown 代码块与 tool-call diff 默认收起(编辑类展开只显 diff,参数/输出 JSON 不透传) | 一致 | — | ✅ |
 | C21 权限交互核心 | resolveInteraction optionId/freeText/action | 已有(allowOnce/allowAlways/deny/custom 本地化) | 一致 | — | |
 | C22 Goal/compact/模型切换 | goalBanner/pause/resume、/compact、switchModelConfig/switchCollaborationMode | 已有 | 一致 | — | |
 | C23 附件上传 | begin/chunk/commit 384KB+sha256、状态机、上限文案 | 已有;失败重试/超限文案待核 | 一致/部分 | — | |
@@ -163,7 +163,7 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 
 ## 批次②实现记录(2026-08-30,chat_page,代码完成+ZLinker 侧截图验收)
 
-- **C1**:`reorderQueueItem`(CAS 命令已在信封集合)补方法体+Gateway 暴露;队列条每行加 上移/下移(同一协议命令,web 为拖拽,行内窄条以按钮代拖拽 ⚠️);行为测试断言 web 参数形状 `{queueItemId, beforeQueueItemId|null}`。
+- **C1**:`reorderQueueItem`(CAS 命令已在信封集合)补方法体+Gateway 暴露;队列条每行加 上移/下移(同一协议命令,web 为拖拽,行内窄条以按钮代拖拽 ⚠️;09-15 已改为真拖拽把手,见文末「官方样式对齐批次」);行为测试断言 web 参数形状 `{queueItemId, beforeQueueItemId|null}`。
 - **C2**:`snoozeInteractionAutoResolution` 接入交互卡「稍后自动继续」(时钟图标+统一灰,InkWell 实现)。
 - **C3**:`setFollowupMode` 此前已有;`sendText.requestedDelivery` 补 `sendTextWithDelivery`(UI 语义由既有队列确认弹窗承载,⌘Enter 语义在触屏无对应键 ⚠️)。
 - **C4**:`cancelBackgroundWork` + 后台横幅逐项 ✕。
@@ -228,3 +228,11 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - **U6**:用量页 ok 态卡片列表末尾「重置机会」卡(两池行 count/最早过期/重置按钮、processing 转圈、暂无文案、禁用态文案、确认框、成功/失败 SnackBar、成功后页面 force 刷新);C9 增量:触顶警告条在任一池 count>0 时追加「使用重置券」(优先 5 小时池),确认→use→entitlement 重拉使警告条即时翻新。i18n `usage.reset.*` + `chat.quota.useReset` 双语。
 - 测试:quota_reset_test 新建 +8(解析畸形输入/过期过滤/缓存与 force/成功链/失败回滚/scope 禁用);device_usage_page_test +4(两池渲染/无 provider id 禁用态/取消不发 RPC/确认成功链+降级不崩);chat_page_test +3(无机会不出现/取消不消耗/确认后警告条翻新)。全量绿。
 - ⚠️ **TODO 真机复测**(桌面 provider 域修复后):复跑 `test/protocol/live_reset_opportunity_probe_test.dart`(env `ZLINKER_PROBE_URL` 驱动,未设置自动跳过)确认 ①status 快照真实字段与白名单一致 ②`useCodingPlanReset` 在真实通道的成功/失败形状 ③entitlement provider 是否携带 `id` 字段(scope 注入依据)。复测通过后再做真机手动验收(写操作消耗真实重置券)。
+
+## 官方样式对齐批次实现记录(2026-09-15,composer/消息流/队列,用户逐项预览验收)
+
+- **composer 圆角**:面板圆角 12=ZRadius.tile、发送/停止按钮 32×32 视觉 mini 6 方形(48 触摸区不变)——官方截图 PIL 像素实测(面板 12px、按钮 ~30px 角 6±1)。
+- **运行中保留发送**:原 `running ? stop : send` 互斥渲染吞掉排队入口;改发送常驻 + running 时停止按钮追加右侧(官方像素:send ↑ 左、stop ■ 最右),_send() 本就支持运行中 held-queue。
+- **代码默认收起**:markdown 代码块头部=语言+N 行+复制+折叠箭标(词条 chat.code.lines 双语);`_ToolCallTile` 的 diff/图片原渲染在 ExpansionTile children 之外(收起后仍全展开刷屏)——移入折叠区,收起只剩「已写入 file +N/-M」摘要行,运行中进度条常显;编辑类展开只显 diff(input/output 参数 JSON 不再透传;无 diff 工具如终端不受影响,error 始终保留)。
+- **队列对齐官方**:容器去 sky 蓝高亮归 ZInk.tile 中性(token 语义本含 queue);队列非空时 placeholder 切官方文案「继续输入以排队后续修改」(chat.input.hint.queued);上移/下移箭头移除,每条独立卡片(card 色/field 8/hairline 边)+ drag_indicator 把手拖拽(ReorderableDragStartListener;本机 Flutter ≥3.41 的 onReorder 已废弃且测试拖拽不触发——须 onReorderItem,widget 测试拖拽用 startGesture+小步 moveBy+pump)。
+- 测试:chat_page_test 增 tool-call 收起断言/拖拽 reorder 参数形状/running send+stop 并存可发送/placeholder 队列态;markdown_view_test 增折叠默认+展开收起切换;全量 346 绿。
