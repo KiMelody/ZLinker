@@ -112,7 +112,7 @@
 | C21 权限交互核心 | resolveInteraction optionId/freeText/action | 已有(allowOnce/allowAlways/deny/custom 本地化) | 一致 | — | |
 | C22 Goal/compact/模型切换 | goalBanner/pause/resume、/compact、switchModelConfig/switchCollaborationMode | 已有 | 一致 | — | |
 | C23 附件上传 | begin/chunk/commit 384KB+sha256、状态机、上限文案 | 已有;失败重试/超限文案待核 | 一致/部分 | — | |
-| C24 subagent 运行进度/详情 | 状态面板「智能体」分区(运行条目+已运行时长)+ composer「Bash x 个、子智能体 y 个」计数;无子会话浏览 | 后台任务条按 `kind=='subagent'` works 分行渲染:实时动作文本(按 childSessionId 匹配 subagent 行 summaryText 流)+ ✕ 取消 + 整行/整块可点;`_SubagentTile` 与 GoalPanel running tile 亦可点 → 只读子会话详情页(订阅 childSessionId,assistantText/reasoning/toolCall 简化时间线+历史翻页,运行中可停止)。**详情页为 native-only 能力补全,web 移动端无对应** | 一致+超出 | P1 | 🔨 |
+| C24 subagent 运行进度/详情 | 状态面板「智能体」分区(运行条目+已运行时长)+ composer「Bash x 个、子智能体 y 个」计数;无子会话浏览 | composer 模式 chip 右侧子智能体 pill(仅运行中,全终态 3s 确认后销毁;仅计子代理——与官方混合计数为有意差异,bash 留 works 灰条不双显)→ 管理 sheet:运行区(spinner+已运行时长+池化实时动作 tail+详情/停止带确认)+已结束区(窗口内 subagent 终态行+rowsRange 翻更早,**native-only**);`_SubagentTile`/GoalPanel running tile/Agent 行亦可点 → 只读子会话详情页(订阅 childSessionId,assistantText/reasoning/toolCall 简化时间线+历史翻页,运行中可停止);works 灰条收敛为 bash-only 单行计数。**详情页/已结束管理为 native-only 能力补全,web 移动端无对应** | 一致+超出 | P1 | ✅(模拟器 adb 实测 2026-09-17:pill 出现/销毁·sheet 三区·详情钻入·停止确认·加载更早翻页至"已全部加载 · 共 N 个"·works 收敛·对话流加载更早两页) |
 
 ## U. device_usage_page(套餐用量)
 
@@ -210,6 +210,13 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - ⚠️ 已知差异:works 行不显示已运行时长(GoalPanel running tile 内已有 `_AgentElapsed`,works 行 MVP 未复制);详情页 running 标记为入口时快照,不随父会话 works 列表实时翻转;子会话内若出现 userInput 行按只读纯文本渲染(probe 窗口未捕获,防御处理)。
 - ⚠️ 待核:mailbox 行(「来自 {sessionId} 的新消息」)两次探测样本均未出现,row kind 与结构未知(PRD Open Question);子会话详情页按默认轻量分隔渲染,待真实样本复测后跟进。
 - 测试:conversation_test +2(subagentsInfo);chat_page_test +3(goal=null 可见/summaryText 流式更新/点击进详情);subagent_detail_page_test 新建 +3(只读时间线/loadOlder 调 rowsRange/停止确认)。
+
+## subagent composer 入口批次实现记录(2026-09-17,任务 09-17-subagent-composer-entry)
+
+- **C24 更新**:works 灰条收敛为 bash-only 单行计数(StatelessWidget,不再持 SubagentFeed 池引用);子智能体底部管理迁移到 composer pill(模式 chip 右侧,`subagentsRunningView`(`subagents.running[]` 终态滞回视图)非空渲染,全终态过 `turnFooterConfirmWindow` 销毁)+ 管理 sheet `_SubagentSheet`(运行区池化实时 tail+详情/停止带确认;已结束区=窗口终态行+rowsRange 翻更早,游标=`oldestRowId` 与已收集最小 rowId 较小者,翻页只进 sheet 本地列表不动 chat rows;dispose 对称释放池引用)。
+- **rowsRange 游标修复**:`ConversationState.oldestRowId`(持有行最小 rowId)取代快照/响应 `firstRowId`(可为占位值 1,live-probe 实证);`prependOlderRows` 回写以实际新增行最小值为准,全重复页不动游标。chat_page/_SubagentSheet/subagent_detail_page 三处 `_loadOlder` 统一换用;「打开会话自动补一页」随之真实生效。
+- ⚠️ 有意差异:pill 仅计子代理(官方混合 bash+子代理计数),bash 留 works 灰条避免双显;已结束区+翻更早为 native-only(web 无对应)。
+- 测试:rows_range_parse_test +2(占位游标两页严格更旧/全重复页不动游标);chat_page_test works-bar 用例改造为 pill+sheet 族(销毁窗/滞回不复活/sheet 实时 tail/停止确认/翻页到头/关闭释放)。
 
 ## 套餐剩余批次实现记录(2026-09-14,任务 09-13-quota-remaining,代码完成,待桌面 entitlement 恢复后复测)
 
