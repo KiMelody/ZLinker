@@ -112,6 +112,7 @@
 | C21 权限交互核心 | resolveInteraction optionId/freeText/action | 已有(allowOnce/allowAlways/deny/custom 本地化) | 一致 | — | |
 | C22 Goal/compact/模型切换 | goalBanner/pause/resume、/compact、switchModelConfig/switchCollaborationMode | 已有 | 一致 | — | |
 | C23 附件上传 | begin/chunk/commit 384KB+sha256、状态机、上限文案 | 已有;失败重试/超限文案待核 | 一致/部分 | — | |
+| C24 subagent 运行进度/详情 | 状态面板「智能体」分区(运行条目+已运行时长)+ composer「Bash x 个、子智能体 y 个」计数;无子会话浏览 | 后台任务条按 `kind=='subagent'` works 分行渲染:实时动作文本(按 childSessionId 匹配 subagent 行 summaryText 流)+ ✕ 取消 + 整行/整块可点;`_SubagentTile` 与 GoalPanel running tile 亦可点 → 只读子会话详情页(订阅 childSessionId,assistantText/reasoning/toolCall 简化时间线+历史翻页,运行中可停止)。**详情页为 native-only 能力补全,web 移动端无对应** | 一致+超出 | P1 | 🔨 |
 
 ## U. device_usage_page(套餐用量)
 
@@ -157,6 +158,7 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 7. `model-provider.onDidChangeProviderRegistry` / `getEndpointSuggestions` / `getModelsByEndpoint` / `refreshPresetProviders`。
 8. `conversationFileRewindPreviewV4` 接 UI。
 9. setting channel `get/update`(范围待定)。
+10. `subagents.list`(@提及子智能体,`device_session.mentionSubagents`)方法名**硬编码未走探测**——私有协议方法名会漂移,待并入 method_probe 候选表(2026-09-13 记)。
 
 ## 批次②实现记录(2026-08-30,chat_page,代码完成+ZLinker 侧截图验收)
 
@@ -199,3 +201,11 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - **终端分组聚合**(`53d8967`):连续 2+ 条执行族工具行折叠为「终端 · N 个命令 · 失败/停止计数 · 首条命令预览」,点击展开;`assistantTurnParts` 新增 rowGroup 部件;3 个行为测试,245 全绿。
 - **业务错误码翻译**:发送/命令失败的错误文本含业务码(1006/1005/3006/3001/3007/3008-3010/3002/2007/429)时,以官方文案替代原始传输错误(web `zcode.error.providerBusiness.*` 对齐;web 按 code+message 关键词分类成 升级/稍后重试 动作桶,横幅动作按钮待真实会话验证后跟进)。
 - **裁剪加载(snapshotRefs)→ ⚠️ 跳过(如实记录)**:schema 已挖到(`toolCall.snapshotRefs: [{field: input|output|raw, refId, hash, fullBytes, previewBytes}]`,notice 文案「该工具有 N 个字段被裁剪…」),但当前 web 构建中 `getTaskSnapshotToolCallsSlice` 只有离线 stub(返回 null),notice 组件在无 loader 时整块不渲染 —— **web 自身无可见行为可对齐**,实现它反而偏离 web。待 web 实装后跟进(schema 随本记录留存)。
+
+## subagent 进度与详情批次实现记录(2026-09-13,任务 09-13-subagent-progress)
+
+- **数据契约**:全部来自 live probe(`.trellis/tasks/09-13-subagent-progress/research/subagents-probe.md`):running 条目/subagent 行/backgroundWorks subagent 条目通过 `childSessionId`/`agentId`(=workId=entityId)/`toolCallId`(=parentToolCallId) 关联;子会话可直接 subscribeConversationV4(与父会话同构快照)。
+- **C24**:协议层仅新增 `ConversationState.subagentsInfo` 类型化 getter(codec/delta 零改动);`_BackgroundWorksBar` 双形态(subagent 分行/bash 单行计数);详情页 `subagent_detail_page.dart` 只读订阅子会话(简化时间线+rowsRange 翻页+运行中停止=对父会话 cancelBackgroundWork);入口×3(works 行/_SubagentTile/GoalPanel running tile,后两者经可选 `onOpenAgent` 回调,goal_panel 不引入 gateway 依赖)。
+- ⚠️ 已知差异:works 行不显示已运行时长(GoalPanel running tile 内已有 `_AgentElapsed`,works 行 MVP 未复制);详情页 running 标记为入口时快照,不随父会话 works 列表实时翻转;子会话内若出现 userInput 行按只读纯文本渲染(probe 窗口未捕获,防御处理)。
+- ⚠️ 待核:mailbox 行(「来自 {sessionId} 的新消息」)两次探测样本均未出现,row kind 与结构未知(PRD Open Question);子会话详情页按默认轻量分隔渲染,待真实样本复测后跟进。
+- 测试:conversation_test +2(subagentsInfo);chat_page_test +3(goal=null 可见/summaryText 流式更新/点击进详情);subagent_detail_page_test 新建 +3(只读时间线/loadOlder 调 rowsRange/停止确认)。
