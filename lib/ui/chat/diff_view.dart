@@ -211,10 +211,10 @@ class DiffView extends StatelessWidget {
               ),
               child: Text(
                 diff.filePath!,
-                style: TextStyle(
-                    fontSize: 10.5,
+                style: ZType.caption.copyWith(
                     fontFamily: 'monospace',
-                    color: ZInk.muted(context)),
+                    color: ZInk.muted(context),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -237,9 +237,8 @@ class DiffView extends StatelessWidget {
                         horizontal: 10, vertical: 1),
                     child: Text(
                       line.text.isEmpty ? ' ' : line.text,
-                      style: TextStyle(
+                      style: ZType.caption.copyWith(
                         fontFamily: 'monospace',
-                        fontSize: 11,
                         height: 1.45,
                         color: switch (line.type) {
                           DiffLineType.added => ZColors.success,
@@ -253,8 +252,9 @@ class DiffView extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: Text(tr(context, 'chat.diff.truncated'),
-                        style: TextStyle(
-                            fontSize: 10, color: ZInk.faint(context))),
+                        style: ZType.caption.copyWith(
+                            color: ZInk.faint(context),
+                        )),
                   ),
               ],
             ),

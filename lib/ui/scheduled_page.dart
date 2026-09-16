@@ -98,7 +98,7 @@ class _ScheduledPageState extends State<ScheduledPage> {
                 trailing: Text(
                   tr(context, 'sched.hint'),
                   style:
-                      TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+                      ZType.caption.copyWith(color: ZInk.ghost(context)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -127,10 +127,10 @@ class _ScheduledPageState extends State<ScheduledPage> {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-                fontSize: 12,
+            style: ZType.sub.copyWith(
                 fontWeight: FontWeight.w600,
-                color: ZInk.muted(context)),
+                color: ZInk.muted(context),
+            ),
           ),
         ),
         if (trailing != null) trailing,
@@ -146,7 +146,7 @@ class _ScheduledPageState extends State<ScheduledPage> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(tr(context, 'sched.noDevices'),
-              style: TextStyle(fontSize: 13, color: ZInk.muted(context))),
+              style: ZType.body.copyWith(color: ZInk.muted(context))),
         ),
       );
     }
@@ -201,17 +201,16 @@ class _ScheduledPageState extends State<ScheduledPage> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(m.deviceLabel,
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600),
+                            style: ZType.bodyStrong,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(width: 8),
                       Text(label,
-                          style: TextStyle(
-                              fontSize: 11,
+                          style: ZType.caption.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: color)),
+                              color: color,
+                          )),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -219,14 +218,14 @@ class _ScheduledPageState extends State<ScheduledPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          TextStyle(fontSize: 12, color: ZInk.muted(context))),
+                          ZType.sub.copyWith(color: ZInk.muted(context))),
                   const SizedBox(height: 4),
                   Text(
                     m.sent
                         ? _fmtDateTime(m.fireAt)
                         : '${_fmtDateTime(m.fireAt)} · ${relativeTime(context, m.fireAt)}',
                     style:
-                        TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+                        ZType.caption.copyWith(color: ZInk.ghost(context)),
                   ),
                   if (m.lastError != null && !m.sent)
                     Padding(
@@ -236,7 +235,7 @@ class _ScheduledPageState extends State<ScheduledPage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style:
-                            TextStyle(fontSize: 11, color: ZColors.danger),
+                            ZType.caption.copyWith(color: ZColors.danger),
                       ),
                     ),
                 ],
@@ -331,10 +330,10 @@ class _AddSheetState extends State<_AddSheet> {
         children: [
           Text(tr(context, 'sched.add'),
               style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ZType.heading),
           const SizedBox(height: 4),
           Text(tr(context, 'sched.hint'),
-              style: TextStyle(fontSize: 11, color: ZInk.muted(context))),
+              style: ZType.caption.copyWith(color: ZInk.muted(context))),
           const SizedBox(height: 16),
           DropdownField<String>(
             value: _deviceId,

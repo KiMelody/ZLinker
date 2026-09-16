@@ -299,17 +299,13 @@ class _TaskListPageState extends State<TaskListPage> {
             children: [
               Text(
                 tr(context, 'tasks.banner.onlineTitle'),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: ZType.heading,
               ),
               Text(
                 online
                     ? tr(context, 'tasks.banner.onlineSubtitle')
                     : widget.device.label,
-                style: TextStyle(
-                  fontSize: 12.5,
+                style: ZType.sub.copyWith(
                   color: online ? ZColors.pillSuccessBg : ZInk.faint(context),
                 ),
               ),
@@ -405,8 +401,7 @@ class _TaskListPageState extends State<TaskListPage> {
                       widget.device.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: ZType.body.copyWith(
                         fontWeight: FontWeight.w600,
                         color: ZInk.solid(context),
                       ),
@@ -445,8 +440,7 @@ class _TaskListPageState extends State<TaskListPage> {
                   Expanded(
                     child: Text(
                       tr(context, 'tasks.projects'),
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: ZType.sub.copyWith(
                         fontWeight: FontWeight.w600,
                         color: ZInk.faint(context),
                       ),
@@ -519,12 +513,12 @@ class _TaskListPageState extends State<TaskListPage> {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(fontSize: 13.5, color: ZInk.soft(context)),
+                style: ZType.body.copyWith(color: ZInk.soft(context)),
               ),
             ),
             Text(
               shortcut,
-              style: TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+              style: ZType.caption.copyWith(color: ZInk.ghost(context)),
             ),
           ],
         ),
@@ -540,8 +534,7 @@ class _TaskListPageState extends State<TaskListPage> {
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
         child: Text(
           tr(context, 'tasks.pinned'),
-          style: TextStyle(
-            fontSize: 11.5,
+          style: ZType.caption.copyWith(
             fontWeight: FontWeight.w500,
             color: ZInk.ghost(context),
           ),
@@ -614,8 +607,7 @@ class _TaskListPageState extends State<TaskListPage> {
                     workspaceTitle(ws),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: ZType.body.copyWith(
                       fontWeight: FontWeight.w500,
                       color: ZInk.soft(context),
                     ),
@@ -624,7 +616,7 @@ class _TaskListPageState extends State<TaskListPage> {
                 if (isActive || entries.isNotEmpty)
                   Text(
                     '${entries.length}',
-                    style: TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+                    style: ZType.caption.copyWith(color: ZInk.ghost(context)),
                   ),
               ],
             ),
@@ -645,7 +637,7 @@ class _TaskListPageState extends State<TaskListPage> {
               padding: const EdgeInsets.fromLTRB(24, 2, 8, 6),
               child: Text(
                 tr(context, 'tasks.archive.empty'),
-                style: TextStyle(fontSize: 12, color: ZInk.ghost(context)),
+                style: ZType.sub.copyWith(color: ZInk.ghost(context)),
               ),
             ),
         ],
@@ -687,8 +679,7 @@ class _TaskListPageState extends State<TaskListPage> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: ZType.body.copyWith(
                       fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
                       color: ZInk.solid(context),
                     ),
@@ -697,7 +688,7 @@ class _TaskListPageState extends State<TaskListPage> {
                 const SizedBox(width: 6),
                 Text(
                   relativeTimeShort(context, entry.lastActivityAt),
-                  style: TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+                  style: ZType.caption.copyWith(color: ZInk.ghost(context)),
                 ),
               ],
             ),
@@ -716,7 +707,7 @@ class _TaskListPageState extends State<TaskListPage> {
       return Center(
         child: Text(
           tr(context, 'tasks.paneHint'),
-          style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+          style: ZType.body.copyWith(color: ZInk.faint(context)),
         ),
       );
     }
@@ -791,8 +782,7 @@ class _TaskListPageState extends State<TaskListPage> {
                           padding: const EdgeInsets.all(24),
                           child: Text(
                             tr(sheetCtx, 'tasks.commandSearch.empty'),
-                            style: TextStyle(
-                              fontSize: 13,
+                            style: ZType.body.copyWith(
                               color: ZInk.faint(sheetCtx),
                             ),
                           ),
@@ -928,7 +918,7 @@ class _TaskListPageState extends State<TaskListPage> {
             else
               for (final ws in session.workspaces)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: ZSpacing.cardGap),
                   child: _workspaceCard(context, session, ws),
                 ),
           ],
@@ -961,16 +951,12 @@ class _TaskListPageState extends State<TaskListPage> {
             children: [
               Text(
                 tr(sheetCtx, 'tasks.sidebar.plugins'),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: ZType.heading,
               ),
               const SizedBox(height: 8),
               Text(
                 tr(sheetCtx, 'tasks.sidebar.pluginsHint'),
-                style: TextStyle(
-                  fontSize: 13,
+                style: ZType.body.copyWith(
                   height: 1.6,
                   color: ZInk.faint(sheetCtx),
                 ),
@@ -996,17 +982,14 @@ class _TaskListPageState extends State<TaskListPage> {
                 tr(context, 'tasks.sectionTitle'),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: ZType.heading,
               ),
               const SizedBox(height: 2),
               Text(
                 trP(context, 'tasks.stats', ['$workspaces', '$tasks']),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, color: ZInk.faint(context)),
+                style: ZType.sub.copyWith(color: ZInk.faint(context)),
               ),
             ],
           ),
@@ -1060,10 +1043,7 @@ class _TaskListPageState extends State<TaskListPage> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
                 tr(sheetCtx, 'tasks.tidy.groupLabel'),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: ZType.heading,
               ),
             ),
             Column(
@@ -1091,8 +1071,7 @@ class _TaskListPageState extends State<TaskListPage> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
               child: Text(
                 tr(sheetCtx, 'tasks.tidy.sortLabel'),
-                style: TextStyle(
-                  fontSize: 12,
+                style: ZType.sub.copyWith(
                   fontWeight: FontWeight.w600,
                   color: ZInk.faint(sheetCtx),
                 ),
@@ -1135,8 +1114,7 @@ class _TaskListPageState extends State<TaskListPage> {
         padding: const EdgeInsets.only(left: 4, bottom: 8),
         child: Text(
           tr(context, 'tasks.pinned'),
-          style: TextStyle(
-            fontSize: 14,
+          style: ZType.bodyStrong.copyWith(
             fontWeight: FontWeight.w500,
             color: ZInk.ghost(context),
           ),
@@ -1144,7 +1122,7 @@ class _TaskListPageState extends State<TaskListPage> {
       ),
       for (final e in entries)
         Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.only(bottom: ZSpacing.cardGap),
           child: _pinnedCard(context, session, e),
         ),
     ];
@@ -1191,8 +1169,7 @@ class _TaskListPageState extends State<TaskListPage> {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14.5,
+                      style: ZType.bodyStrong.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1201,10 +1178,7 @@ class _TaskListPageState extends State<TaskListPage> {
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: ZInk.faint(context),
-                      ),
+                      style: ZType.sub.copyWith(color: ZInk.faint(context)),
                     ),
                   ],
                 ),
@@ -1232,7 +1206,7 @@ class _TaskListPageState extends State<TaskListPage> {
           child: Center(
             child: Text(
               tr(context, 'tasks.empty'),
-              style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+              style: ZType.body.copyWith(color: ZInk.faint(context)),
             ),
           ),
         ),
@@ -1254,8 +1228,7 @@ class _TaskListPageState extends State<TaskListPage> {
           padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
           child: Text(
             bucket.key,
-            style: TextStyle(
-              fontSize: 14,
+            style: ZType.bodyStrong.copyWith(
               fontWeight: FontWeight.w500,
               color: ZInk.ghost(context),
             ),
@@ -1300,8 +1273,7 @@ class _TaskListPageState extends State<TaskListPage> {
             padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
             child: Text(
               workspaceTitle(ws),
-              style: TextStyle(
-                fontSize: 14,
+              style: ZType.bodyStrong.copyWith(
                 fontWeight: FontWeight.w500,
                 color: ZInk.ghost(context),
               ),
@@ -1323,7 +1295,7 @@ class _TaskListPageState extends State<TaskListPage> {
           child: Center(
             child: Text(
               tr(context, 'tasks.archive.empty'),
-              style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+              style: ZType.body.copyWith(color: ZInk.faint(context)),
             ),
           ),
         ),
@@ -1404,10 +1376,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                 workspaceTitle(ws),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: ZType.bodyStrong,
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -1428,8 +1397,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                 '${ws['workspacePath'] ?? ''}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11.5,
+                                style: ZType.caption.copyWith(
                                   color: ZInk.faint(context),
                                 ),
                               ),
@@ -1442,8 +1410,7 @@ class _TaskListPageState extends State<TaskListPage> {
                             trP(context, 'tasks.updatedAt', [
                               relativeTimeShort(context, lastActivity),
                             ]),
-                            style: TextStyle(
-                              fontSize: 11,
+                            style: ZType.caption.copyWith(
                               color: ZInk.ghost(context),
                             ),
                           ),
@@ -1455,10 +1422,7 @@ class _TaskListPageState extends State<TaskListPage> {
                   if (isActive || entries.isNotEmpty)
                     Text(
                       trP(context, 'tasks.taskCount', ['${entries.length}']),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: ZInk.faint(context),
-                      ),
+                      style: ZType.caption.copyWith(color: ZInk.faint(context)),
                     ),
                   Icon(
                     expanded
@@ -1491,10 +1455,7 @@ class _TaskListPageState extends State<TaskListPage> {
                 child: Center(
                   child: Text(
                     tr(context, 'tasks.empty'),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: ZInk.faint(context),
-                    ),
+                    style: ZType.sub.copyWith(color: ZInk.faint(context)),
                   ),
                 ),
               )
@@ -1546,7 +1507,7 @@ class _TaskListPageState extends State<TaskListPage> {
       ),
       child: Text(
         tr(context, 'tasks.workspaceKind.$kind'),
-        style: TextStyle(fontSize: 10, color: ZInk.faint(context)),
+        style: ZType.caption.copyWith(color: ZInk.faint(context)),
       ),
     );
   }
@@ -1610,7 +1571,7 @@ class _TaskListPageState extends State<TaskListPage> {
     final awaiting = entry.pendingInteraction != null;
     final unread = entry.raw['unreadAt'] != null;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       child: Material(
         color: highlight
             ? Colors.white.withValues(alpha: 0.1)
@@ -1648,12 +1609,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                 title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: unread
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                ),
+                                style: ZType.bodyStrong,
                               ),
                             ),
                           ],
@@ -1670,8 +1626,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                 subtitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12.5,
+                                style: ZType.sub.copyWith(
                                   color: ZInk.faint(context),
                                 ),
                               ),
@@ -1702,8 +1657,7 @@ class _TaskListPageState extends State<TaskListPage> {
       ),
       child: Text(
         tr(context, 'tasks.awaiting'),
-        style: const TextStyle(
-          fontSize: 9.5,
+        style: ZType.caption.copyWith(
           fontWeight: FontWeight.w500,
           color: ZColors.warning,
         ),
@@ -2094,7 +2048,7 @@ class _TaskListPageState extends State<TaskListPage> {
               const SizedBox(height: 16),
               Text(
                 tr(context, 'tasks.loading'),
-                style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+                style: ZType.body.copyWith(color: ZInk.faint(context)),
               ),
             ],
           ),
@@ -2110,11 +2064,7 @@ class _TaskListPageState extends State<TaskListPage> {
             const SizedBox(height: 16),
             Text(
               tr(context, 'tasks.fallback.title'),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ZInk.solid(context),
-              ),
+              style: ZType.heading.copyWith(color: ZInk.solid(context)),
             ),
             const SizedBox(height: 8),
             Text(
@@ -2122,7 +2072,7 @@ class _TaskListPageState extends State<TaskListPage> {
               textAlign: TextAlign.center,
               maxLines: 5,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+              style: ZType.body.copyWith(color: ZInk.faint(context)),
             ),
             const SizedBox(height: 16),
             FilledButton(
@@ -2205,11 +2155,7 @@ class _ConnectionBanner extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Text(
           tr(context, 'tasks.banner.onlineDesc'),
-          style: TextStyle(
-            fontSize: 13,
-            height: 1.6,
-            color: ZInk.faint(context),
-          ),
+          style: ZType.body.copyWith(height: 1.6, color: ZInk.faint(context)),
         ),
       ),
     );
@@ -2260,8 +2206,7 @@ class _ConnectionBanner extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: ZType.body.copyWith(
                       fontWeight: FontWeight.w600,
                       color: ZInk.solid(context),
                     ),
@@ -2271,7 +2216,7 @@ class _ConnectionBanner extends StatelessWidget {
                     body,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: ZInk.faint(context)),
+                    style: ZType.sub.copyWith(color: ZInk.faint(context)),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -2286,7 +2231,7 @@ class _ConnectionBanner extends StatelessWidget {
                           },
                           child: Text(
                             tr(context, 'tasks.retry'),
-                            style: const TextStyle(fontSize: 12),
+                            style: ZType.sub,
                           ),
                         ),
                       ),
@@ -2296,7 +2241,7 @@ class _ConnectionBanner extends StatelessWidget {
                           onPressed: onWeb,
                           child: Text(
                             tr(context, 'tasks.openWeb'),
-                            style: const TextStyle(fontSize: 12),
+                            style: ZType.sub,
                           ),
                         ),
                       ),

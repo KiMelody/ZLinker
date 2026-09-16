@@ -68,7 +68,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   width: 420,
                   child: SingleChildScrollView(
                     child: SelectableText(update.body!,
-                        style: const TextStyle(fontSize: 12, height: 1.5)),
+                        style: ZType.sub),
                   ),
                 ),
           actions: [
@@ -239,8 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
         child: Text(
           text,
-          style: TextStyle(
-            fontSize: 12,
+          style: ZType.sub.copyWith(
             fontWeight: FontWeight.w600,
             color: ZInk.muted(context),
           ),

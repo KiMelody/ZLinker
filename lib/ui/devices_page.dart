@@ -190,7 +190,7 @@ class _DevicesPageState extends State<DevicesPage>
           maxLines: 4,
           minLines: 2,
           keyboardType: TextInputType.url,
-          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+          style: ZType.body.copyWith(fontFamily: 'monospace'),
           decoration: InputDecoration(
             hintText: tr(context, 'devices.add.pasteHint2'),
           ),
@@ -351,7 +351,7 @@ class _DevicesPageState extends State<DevicesPage>
           controller: controller,
           maxLines: 5,
           minLines: 3,
-          style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          style: ZType.sub.copyWith(fontFamily: 'monospace'),
           decoration: InputDecoration(hintText: tr(context, 'devices.import.hint')),
         ),
         actions: [
@@ -476,15 +476,12 @@ class _DevicesPageState extends State<DevicesPage>
             ),
             const SizedBox(height: 20),
             Text(tr(context, 'devices.empty.title'),
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: ZInk.solid(context))),
+                style: ZType.title.copyWith(color: ZInk.solid(context))),
             const SizedBox(height: 8),
             Text(
               tr(context, 'devices.empty.body'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: ZInk.faint(context)),
+              style: ZType.body.copyWith(color: ZInk.faint(context)),
             ),
           ],
         ),
@@ -512,8 +509,7 @@ class _DevicesPageState extends State<DevicesPage>
                 Expanded(
                   child: Text(
                     device.label,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
+                    style: ZType.heading,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -528,8 +524,9 @@ class _DevicesPageState extends State<DevicesPage>
                   _statusLine(context, session),
                   if (host.isNotEmpty)
                     Text(host,
-                        style: TextStyle(
-                            fontSize: 11, color: ZInk.faint(context))),
+                        style: ZType.caption.copyWith(
+                            color: ZInk.faint(context),
+                        )),
                   Text(
                     device.lastUsedAt != null
                         ? trP(context, 'devices.lastUsed', [
@@ -537,7 +534,7 @@ class _DevicesPageState extends State<DevicesPage>
                           ])
                         : tr(context, 'devices.neverUsed'),
                     style:
-                        TextStyle(fontSize: 11, color: ZInk.ghost(context)),
+                        ZType.caption.copyWith(color: ZInk.ghost(context)),
                   ),
                 ],
               ),
@@ -655,8 +652,7 @@ class _DevicesPageState extends State<DevicesPage>
               ),
               child: Text(
                 running > 9 ? '9+' : '$running',
-                style: const TextStyle(
-                  fontSize: 10,
+                style: ZType.caption.copyWith(
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -681,6 +677,6 @@ class _DevicesPageState extends State<DevicesPage>
           : (tr(context, 'status.error'), ZColors.danger),
       _ => (tr(context, 'status.offline'), ZInk.ghost(context)),
     };
-    return Text(text, style: TextStyle(fontSize: 12, color: color));
+    return Text(text, style: ZType.sub.copyWith(color: color));
   }
 }

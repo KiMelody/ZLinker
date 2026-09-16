@@ -58,6 +58,101 @@ class ZColors {
   static const usageGreen = Color(0xFF87D9A4); // reset countdown + pill
 }
 
+/// Card-list spacing scale (usage / settings screens).
+abstract final class ZSpacing {
+  /// Gap between adjacent cards in a list. Cards carry no default margin
+  /// ([zCardTheme] sets `margin: EdgeInsets.zero`), so the on-screen
+  /// separation between two cards equals [cardGap].
+  static const double cardGap = 16;
+
+  /// Page edge padding for card-list screens.
+  static const double screen = 16;
+}
+
+/// Font family bundled with the app. The three static weights come from the
+/// Noto Sans SC variable font, subset to the app character set by
+/// `tool/font_subset.py`.
+const String zFontFamily = 'NotoSansSC';
+
+/// Fallback chain: the bundled family first (for styles used outside a themed
+/// `Text`), then emoji faces, then the platform CJK faces. Without an explicit
+/// CJK family the engine picks whatever the host offers — Windows lands on
+/// traditional-Chinese / Yu Gothic faces, and ROM CJK fonts fake every
+/// intermediate weight.
+const List<String> zFontFallback = [
+  'NotoSansSC',
+  'Segoe UI Emoji',
+  'Apple Color Emoji',
+  'PingFang SC',
+  'Microsoft YaHei',
+  'Noto Sans CJK SC',
+  'sans-serif',
+];
+
+/// Typography scale. Seven tiers replace the twelve ad-hoc sizes that were
+/// hardcoded at 300+ call sites; each tier carries the bundled family and the
+/// shared [zFontFallback] chain so stray inline styles stay covered.
+///
+/// Sizes 6 / 9 / 10 map to [caption], 18 to [display], and 16 to [heading] or
+/// [title] by context — the per-site decisions live in `implement.jsonl`.
+abstract final class ZType {
+  /// Screen-level hero numbers and markdown h1.
+  static const TextStyle display = TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Page titles, app bar titles, markdown h2, list-row primary text.
+  static const TextStyle title = TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Card headers and section headings.
+  static const TextStyle heading = TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      height: 1.4,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Emphasised body text (buttons, key/value pairs, inline labels).
+  static const TextStyle bodyStrong = TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      height: 1.4,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Default body text.
+  static const TextStyle body = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w400,
+      height: 1.5,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Secondary text (list subtitles, metadata).
+  static const TextStyle sub = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      height: 1.5,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+
+  /// Timestamps, badges and other supporting text.
+  static const TextStyle caption = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w400,
+      height: 1.4,
+      fontFamily: zFontFamily,
+      fontFamilyFallback: zFontFallback);
+}
+
 /// Theme-aware text colors mirroring the official foreground tokens.
 class ZInk {
   ZInk._();
@@ -180,14 +275,15 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: background,
+    fontFamily: zFontFamily,
+    fontFamilyFallback: zFontFallback,
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
       backgroundColor: background,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
-          color: foreground, fontSize: 17, fontWeight: FontWeight.w600),
+      titleTextStyle: ZType.title.copyWith(color: foreground),
       iconTheme: IconThemeData(color: foreground),
     ),
     // card/dialog visuals ride the CardTheme/DialogTheme widgets in
@@ -236,13 +332,13 @@ ThemeData _base(ColorScheme scheme, Color background, Color card,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        textStyle: ZType.bodyStrong.copyWith(fontWeight: FontWeight.w500),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: foreground,
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        textStyle: ZType.bodyStrong.copyWith(fontWeight: FontWeight.w500),
       ),
     ),
     listTileTheme: ListTileThemeData(

@@ -12,38 +12,34 @@ import '../ui_settings.dart';
 class ZLinkerMarkdown extends StatelessWidget {
   final String data;
   final bool selectable;
-  final double fontSize;
+
+  /// Base style for prose. Chat bodies use the default [ZType.body]; compact
+  /// surfaces (reasoning strips, sub-agent detail) pass [ZType.sub].
+  final TextStyle bodyStyle;
 
   const ZLinkerMarkdown(
     this.data, {
     super.key,
     this.selectable = true,
-    this.fontSize = 14,
+    this.bodyStyle = ZType.body,
   });
 
   @override
   Widget build(BuildContext context) {
-    final codeFont = fontSize - 1.5;
+    final body = bodyStyle.copyWith(height: 1.6);
+    final code = ZType.sub.copyWith(fontFamily: 'monospace');
     final styleSheet = MarkdownStyleSheet(
-      p: TextStyle(
-          fontSize: fontSize, height: 1.6, color: ZInk.solid(context)),
-      h1: const TextStyle(
-          fontSize: 20, fontWeight: FontWeight.w700, height: 1.6),
-      h2: const TextStyle(
-          fontSize: 18, fontWeight: FontWeight.w700, height: 1.6),
-      h3: const TextStyle(
-          fontSize: 16, fontWeight: FontWeight.w600, height: 1.6),
-      h4: const TextStyle(
-          fontSize: 15, fontWeight: FontWeight.w600, height: 1.6),
-      code: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: codeFont,
+      p: body.copyWith(color: ZInk.solid(context)),
+      h1: ZType.display.copyWith(height: 1.6),
+      h2: ZType.title.copyWith(height: 1.6),
+      h3: ZType.heading.copyWith(height: 1.6),
+      h4: ZType.bodyStrong.copyWith(height: 1.6),
+      code: code.copyWith(
         backgroundColor: ZInk.codeInlineBg(context),
         color: ZInk.solid(context),
       ),
       codeblockDecoration: const BoxDecoration(),
-      blockquote: TextStyle(
-          fontSize: fontSize, color: ZInk.soft(context), height: 1.6),
+      blockquote: body.copyWith(color: ZInk.soft(context)),
       blockquoteDecoration: BoxDecoration(
         border: Border(
           left: BorderSide(
@@ -51,21 +47,17 @@ class ZLinkerMarkdown extends StatelessWidget {
         ),
       ),
       blockquotePadding: const EdgeInsets.only(left: 12),
-      listBullet: TextStyle(
-          fontSize: fontSize, height: 1.6, color: ZInk.solid(context)),
-      tableBody: TextStyle(
-          fontSize: fontSize - 1, color: ZInk.solid(context)),
-      tableHead: TextStyle(
-          fontSize: fontSize - 1,
-          fontWeight: FontWeight.w600,
-          color: ZInk.solid(context)),
+      listBullet: body.copyWith(color: ZInk.solid(context)),
+      tableBody: ZType.sub.copyWith(color: ZInk.solid(context)),
+      tableHead: ZType.sub.copyWith(
+          fontWeight: FontWeight.w600, color: ZInk.solid(context)),
       tableBorder: TableBorder.all(color: ZInk.hairline(context), width: 1),
       tableCellsPadding:
           const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       horizontalRuleDecoration: BoxDecoration(
         border: Border(top: BorderSide(color: ZInk.hairline(context))),
       ),
-      a: TextStyle(
+      a: ZType.body.copyWith(
           color: ZColors.sky500, decoration: TextDecoration.underline),
     );
 
@@ -74,7 +66,7 @@ class ZLinkerMarkdown extends StatelessWidget {
       selectable: selectable,
       styleSheet: styleSheet,
       builders: {
-        'code': _CodeBlockBuilder(codeFontSize: codeFont),
+        'code': _CodeBlockBuilder(codeStyle: code),
       },
       softLineBreak: true,
     );
@@ -82,9 +74,9 @@ class ZLinkerMarkdown extends StatelessWidget {
 }
 
 class _CodeBlockBuilder extends MarkdownElementBuilder {
-  final double codeFontSize;
+  final TextStyle codeStyle;
 
-  _CodeBlockBuilder({required this.codeFontSize});
+  _CodeBlockBuilder({required this.codeStyle});
 
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
@@ -100,19 +92,19 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
       // inline code: default styling
       return null;
     }
-    return _CodeBlock(code: code, language: language, fontSize: codeFontSize);
+    return _CodeBlock(code: code, language: language, codeStyle: codeStyle);
   }
 }
 
 class _CodeBlock extends StatelessWidget {
   final String code;
   final String language;
-  final double fontSize;
+  final TextStyle codeStyle;
 
   const _CodeBlock({
     required this.code,
     required this.language,
-    required this.fontSize,
+    required this.codeStyle,
   });
 
   @override
@@ -139,8 +131,7 @@ class _CodeBlock extends StatelessWidget {
               children: [
                 Text(
                   language.isEmpty ? 'code' : language,
-                  style: TextStyle(
-                      fontSize: 10.5,
+                  style: ZType.caption.copyWith(
                       color: ZInk.faint(context),
                       fontFamily: 'monospace'),
                 ),
@@ -171,9 +162,7 @@ class _CodeBlock extends StatelessWidget {
               code.endsWith('\n')
                   ? code.substring(0, code.length - 1)
                   : code,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: fontSize,
+              style: codeStyle.copyWith(
                 height: 1.5,
                 color: ZInk.codeText(context),
               ),

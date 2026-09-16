@@ -64,8 +64,10 @@ class PhasePill extends StatelessWidget {
               Icon(icon, size: 10, color: fg),
             const SizedBox(width: 4),
             Text(label,
-                style: TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w500, color: fg)),
+                style: ZType.caption.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: fg,
+                )),
           ],
         ),
       );
@@ -92,10 +94,10 @@ class PhasePill extends StatelessWidget {
             Icon(icon, size: 10, color: color),
           const SizedBox(width: 4),
           Text(label,
-              style: TextStyle(
-                  fontSize: 10.5,
+              style: ZType.caption.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: color)),
+                  color: color,
+              )),
         ],
       ),
     );
