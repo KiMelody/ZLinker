@@ -374,6 +374,176 @@ void main() {
     });
   });
 
+  group('pendingInteractions wire forms', () {
+    late ConversationState state;
+
+    setUp(() {
+      state = ConversationState();
+    });
+
+    /// A pending AskUserQuestion tool call row exactly as the desktop pushes
+    /// it (`onPermissionRequested`): status + the resolveInteraction id, the
+    /// tool input carrying the questions.
+    Map<String, dynamic> pendingAskRow({
+      String interactionId = 'perm-call_7',
+      bool pending = true,
+      List<Object?>? questions,
+    }) => {
+      'rowId': 12,
+      'kind': 'toolCall',
+      'toolCallId': 'call_7',
+      'toolName': 'AskUserQuestion',
+      'status': pending ? 'pendingApproval' : 'success',
+      if (pending) 'approvalInteractionId': interactionId,
+      'input': {
+        'questions': questions ??
+            [
+              {
+                'question': '选择环境',
+                'header': '环境',
+                'options': [
+                  {'value': 'dev', 'label': '开发'},
+                  {'value': 'prod', 'label': '生产'},
+                ],
+              },
+            ],
+      },
+    };
+
+    test('full list form is returned as-is (online delta form)', () {
+      final interaction = {
+        'interactionId': 'i1',
+        'kind': 'permission',
+        'payload': {
+          'kind': 'permission',
+          'toolName': 'Bash',
+          'summary': 'rm -rf',
+          'options': [
+            {'optionId': 'o1', 'kind': 'allowOnce'},
+          ],
+        },
+      };
+      _injectSnapshot(state, snapshot: {
+        'pendingInteractions': [interaction],
+      });
+
+      expect(state.pendingInteractions, [interaction]);
+    });
+
+    test(
+      'summary count object is never parsed as a list — cards rebuild from rows',
+      () {
+        // 3.12.3 snapshot assembly: the relay snapshot projects the summary
+        // into `pendingInteractions` (asar sessionOverlay), never a list.
+        _injectSnapshot(state, rows: [pendingAskRow()], snapshot: {
+          'pendingInteractions': {'permissionCount': 0, 'userInputCount': 1},
+        });
+
+        final interactions = state.pendingInteractions;
+        expect(interactions, hasLength(1));
+        final interaction = interactions.single;
+        expect(interaction['interactionId'], 'perm-call_7');
+        expect(interaction['kind'], 'userInput');
+        expect(interaction['anchorRowId'], 12);
+        final payload = interaction['payload'] as Map;
+        expect(payload['kind'], 'userInput');
+        expect(payload['toolCallId'], 'call_7');
+        expect(payload['toolName'], 'AskUserQuestion');
+        final questions = payload['questions'] as List;
+        expect(questions.single['question'], '选择环境');
+        expect((questions.single['options'] as List).first['value'], 'dev');
+      },
+    );
+
+    test('summary form without pending rows yields no interactions', () {
+      _injectSnapshot(state, snapshot: {
+        'pendingInteractions': {'permissionCount': 1, 'userInputCount': 0},
+      });
+
+      expect(state.pendingInteractions, isEmpty);
+    });
+
+    test('rebuild skips settled rows, other tools and plain rows', () {
+      _injectSnapshot(state, rows: [
+        pendingAskRow(pending: false), // resolved: id cleared server-side
+        {
+          ...pendingAskRow(interactionId: 'perm-call_8'),
+          'rowId': 13,
+          'toolCallId': 'call_8',
+          'toolName': 'Bash', // permission-kind: not rebuildable from rows
+        },
+        {'rowId': 14, 'kind': 'userInput', 'text': 'hi'},
+      ]);
+
+      expect(state.pendingInteractions, isEmpty);
+    });
+
+    test('question normalization mirrors the agent core oIs', () {
+      _injectSnapshot(
+        state,
+        rows: [
+          pendingAskRow(questions: [
+            // valid: header falls back to nothing present → question text
+            {
+              'question': 'q1',
+              'options': [
+                {'label': '仅标签'},
+                {'value': 'v2'},
+                {'label': 'l3', 'value': 'v3', 'description': '描述'},
+                {}, // dropped: no value/label
+              ],
+            },
+            // dropped: no question text
+            {
+              'header': 'h',
+              'options': [
+                {'value': 'x'},
+              ],
+            },
+            // dropped: no options
+            {'question': 'q3', 'options': []},
+          ]),
+        ],
+      );
+
+      final questions =
+          (state.pendingInteractions.single['payload'] as Map)['questions']
+              as List;
+      expect(questions, hasLength(1));
+      final q1 = questions.single;
+      expect(q1['question'], 'q1');
+      expect(q1['header'], 'q1');
+      expect(q1['multiSelect'], isNull);
+      expect(q1['options'], [
+        {'value': '仅标签', 'label': '仅标签'},
+        {'value': 'v2', 'label': 'v2'},
+        {'value': 'v3', 'label': 'l3', 'description': '描述'},
+      ]);
+    });
+
+    test('resolve clears the rebuilt card through the row update', () {
+      _injectSnapshot(state, rows: [pendingAskRow()]);
+      expect(state.pendingInteractions, hasLength(1));
+
+      // settlePermission: the row upsert arrives with the id deleted.
+      state.applyFrame({
+        'payload': {
+          'kind': 'deltas',
+          'deltas': [
+            {
+              'op': 'row.upserted',
+              'row': pendingAskRow(pending: false),
+            },
+          ],
+        },
+        'fromSeq': 5,
+        'toSeq': 6,
+      }, onGap: () => fail('should not gap'));
+
+      expect(state.pendingInteractions, isEmpty);
+    });
+  });
+
   group('usage_update events & contextUsage', () {
     late ConversationState state;
 

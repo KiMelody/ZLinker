@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,6 +19,31 @@ import '../helpers/recording_chat_gateway.dart';
 /// command calls recorded in `calls` and answered `accepted` (the
 /// conversation command surface goes through `conversationCommands`).
 class FakeChatGateway extends RecordingChatGateway {}
+
+/// Transport that never answers `resolveInteraction` — holds the questions
+/// card in its busy state for assertions (the real gateway ack is a passing
+/// instant no frame can catch). Unrelated members are never exercised.
+class _HoldTransport implements ConversationTransport {
+  @override
+  Future<dynamic> resolveInteraction(
+    String sessionId,
+    String interactionId, {
+    String? optionId,
+    String? freeText,
+    String? action,
+    Map<String, dynamic>? content,
+  }) async => Completer<dynamic>().future;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+class _HoldResolveGateway extends FakeChatGateway {
+  final _hold = _HoldTransport();
+
+  @override
+  ConversationTransport get conversationCommands => _hold;
+}
 
 Widget wrap(Widget child) => MaterialApp(
   theme: buildDarkTheme(),
@@ -183,6 +210,500 @@ void main() {
         .single;
     expect(call.$2[1], 'i1');
     expect(call.$2[2], 'o1');
+  });
+
+  /// Form-style `userInput` interaction (the `questions` payload) with the
+  /// official field names: `label`/`question` question text, `multiSelect`
+  /// flag and `value`/`label` options.
+  Map<String, dynamic> questionsInteraction(
+    List<Map<String, dynamic>> questions,
+  ) => {
+    'interactionId': 'iq',
+    'payload': {'kind': 'userInput', 'questions': questions},
+  };
+
+  const envQuestion = {
+    'value': 'env',
+    'label': '选择环境',
+    'multiSelect': false,
+    'options': [
+      {'value': 'dev', 'label': '开发'},
+      {'value': 'prod', 'label': '生产'},
+    ],
+  };
+
+  const extrasQuestion = {
+    'value': 'extras',
+    'label': '附加组件',
+    'multiSelect': true,
+    'options': [
+      {'value': 'lint', 'label': 'Lint'},
+      {'value': 'test', 'label': '测试'},
+    ],
+  };
+
+  Future<FakeChatGateway> pumpQuestions(
+    WidgetTester tester,
+    List<Map<String, dynamic>> questions, {
+    FakeChatGateway? gateway,
+  }) async {
+    final gw = gateway ?? FakeChatGateway();
+    gw.snapshotExtra = {
+      'pendingInteractions': [questionsInteraction(questions)],
+    };
+    await tester.pumpWidget(
+      wrap(ChatPage(gateway: gw, sessionId: 's1', title: 't')),
+    );
+    gw.feedSnapshot([
+      {'rowId': 1, 'kind': 'userInput', 'text': 'hi'},
+    ]);
+    await tester.pumpAndSettle();
+    return gw;
+  }
+
+  Finder chipOf(String label) =>
+      find.ancestor(of: find.text(label), matching: find.byType(FilterChip));
+
+  Finder customField(int index) => find.byKey(ValueKey('askq-custom-$index'));
+
+  final submitKey = find.byTooltip('提交回答');
+
+  testWidgets('questions collect locally and submit full content once', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion, extrasQuestion]);
+
+    await tester.tap(find.text('开发'));
+    await tester.tap(find.text('Lint'));
+    await tester.tap(find.text('测试'));
+    await tester.pump();
+    // Local collection only: no RPC until the explicit submit.
+    expect(
+      gateway.calls.where((c) => c.$1 == 'resolveInteraction'),
+      isEmpty,
+    );
+
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[1], 'iq');
+    // Official buildBotElicitationContent shape, whole-map assertion.
+    expect(call.$2[3], {
+      'answers': {'选择环境': '开发', '附加组件': 'Lint, 测试'},
+      'answer_0': 'dev',
+      'answer_1': ['lint', 'test'],
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('unanswered questions are skipped, multiSelect unchecks', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion, extrasQuestion]);
+
+    await tester.tap(find.text('Lint'));
+    await tester.pump();
+    await tester.tap(find.text('测试'));
+    await tester.pump();
+    await tester.tap(find.text('Lint')); // uncheck again
+    await tester.pump();
+
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    // Question 0 absent → no answers entry and no answer_0.
+    expect(call.$2[3], {
+      'answers': {'附加组件': '测试'},
+      'answer_1': ['test'],
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('single-select re-choice overrides the first pick', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion, extrasQuestion]);
+
+    await tester.tap(find.text('开发'));
+    await tester.pump();
+    await tester.tap(find.text('生产'));
+    await tester.pump();
+
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {
+      'answers': {'选择环境': '生产'},
+      'answer_0': 'prod',
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('single-question submit carries the flat answer field', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion]);
+
+    await tester.tap(find.text('开发'));
+    await tester.pump();
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {
+      'answers': {'选择环境': '开发'},
+      'answer_0': 'dev',
+      'answer': 'dev',
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('single toggle-off clears; empty submit is the no-answer send', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion]);
+
+    await tester.tap(chipOf('开发'));
+    await tester.pump();
+    expect(find.text('已答 1/1'), findsOneWidget);
+    await tester.tap(chipOf('开发')); // second tap deselects (unified toggle)
+    await tester.pump();
+    expect(tester.widget<FilterChip>(chipOf('开发')).selected, isFalse);
+    // Nothing answered: the counter hint is hidden again.
+    expect(find.textContaining('已答'), findsNothing);
+
+    // The ↑ key stays tappable with nothing picked — the explicit
+    // "no answer" submit carries just the empty answers map.
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {'answers': {}});
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('composer stays put while an interaction awaits', (tester) async {
+    final gateway = await pumpQuestions(tester, [envQuestion]);
+
+    // The interaction card is up and the composer coexists with it: answers
+    // live inside the card, the composer only ever sends new messages.
+    expect(submitKey, findsOneWidget);
+    expect(find.text('提出后续修改要求'), findsOneWidget);
+
+    // Once the interaction clears (desktop pushes a snapshot without it),
+    // the card goes away and the composer is still there.
+    gateway.snapshotExtra = const {};
+    gateway.feedSnapshot(const [
+      {'rowId': 1, 'kind': 'userInput', 'text': 'hi'},
+      {'rowId': 2, 'kind': 'assistant', 'text': 'done'},
+    ]);
+    await tester.pumpAndSettle();
+    expect(find.text('提出后续修改要求'), findsOneWidget);
+    expect(submitKey, findsNothing);
+  });
+
+  testWidgets('reload snapshot (summary form) rebuilds the ask card', (
+    tester,
+  ) async {
+    final gateway = FakeChatGateway();
+    // 3.12.3 relay snapshot: the summary count object stands in for the
+    // interaction list — the card must rebuild from the pendingApproval
+    // tool call row instead.
+    gateway.snapshotExtra = {
+      'pendingInteractions': {'permissionCount': 0, 'userInputCount': 1},
+    };
+    await tester.pumpWidget(
+      wrap(ChatPage(gateway: gateway, sessionId: 's1', title: 't')),
+    );
+    gateway.feedSnapshot([
+      {'rowId': 1, 'kind': 'userInput', 'text': 'hi'},
+      {
+        'rowId': 2,
+        'kind': 'toolCall',
+        'toolCallId': 'call_7',
+        'toolName': 'AskUserQuestion',
+        'status': 'pendingApproval',
+        'approvalInteractionId': 'perm-call_7',
+        'input': {
+          'questions': [
+            {
+              'question': '选择环境',
+              'header': '环境',
+              'options': [
+                {'value': 'dev', 'label': '开发'},
+                {'value': 'prod', 'label': '生产'},
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    await tester.pumpAndSettle();
+
+    // Card is up (chips + submit key) and the composer coexists with it.
+    expect(find.text('开发'), findsOneWidget);
+    expect(submitKey, findsOneWidget);
+    expect(find.text('提出后续修改要求'), findsOneWidget);
+
+    await tester.tap(find.text('开发'));
+    await tester.pump();
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    // The rebuilt card resolves under the row's approvalInteractionId —
+    // the exact id the desktop derived (`perm-<toolCallId>`).
+    expect(call.$2[1], 'perm-call_7');
+    expect(call.$2[3], {
+      'answers': {'选择环境': '开发'},
+      'answer_0': 'dev',
+      'answer': 'dev',
+    });
+  });
+
+  testWidgets('questions card renders no free-text reply row', (tester) async {
+    final gateway = FakeChatGateway();
+    gateway.snapshotExtra = {
+      'pendingInteractions': [
+        {
+          'interactionId': 'iq',
+          'payload': {
+            'kind': 'userInput',
+            'freeText': true,
+            'questions': [envQuestion],
+          },
+        },
+      ],
+    };
+    await tester.pumpWidget(
+      wrap(ChatPage(gateway: gateway, sessionId: 's1', title: 't')),
+    );
+    gateway.feedSnapshot([
+      {'rowId': 1, 'kind': 'userInput', 'text': 'hi'},
+    ]);
+    await tester.pumpAndSettle();
+
+    // AskUserQuestion payloads carry freeText=true, yet the questions form
+    // (with its per-question custom input) replaces the reply row.
+    expect(find.text('开发'), findsOneWidget);
+    expect(find.text('输入回复…'), findsNothing);
+  });
+
+  testWidgets('freeText-only interaction keeps the reply input row', (
+    tester,
+  ) async {
+    final gateway = FakeChatGateway();
+    gateway.snapshotExtra = {
+      'pendingInteractions': [
+        {
+          'interactionId': 'if',
+          'payload': {'kind': 'userInput', 'prompt': '说说想法', 'freeText': true},
+        },
+      ],
+    };
+    await tester.pumpWidget(
+      wrap(ChatPage(gateway: gateway, sessionId: 's1', title: 't')),
+    );
+    gateway.feedSnapshot([
+      {'rowId': 1, 'kind': 'userInput', 'text': 'hi'},
+    ]);
+    await tester.pumpAndSettle();
+
+    // No questions form → the reply row is the answering channel (the
+    // composer coexists for new messages, so target the reply field).
+    expect(find.text('输入回复…'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, '输入回复…'), '就这样');
+    await tester.tap(find.byIcon(Icons.send));
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[1], 'if');
+  });
+
+  testWidgets('single custom input is exclusive and collapse always clears', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion]);
+
+    await tester.tap(chipOf('开发'));
+    await tester.pump();
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    // Expanding custom is the custom pick: the option deselects (mutually
+    // exclusive) and the inline input mounts focused.
+    expect(tester.widget<FilterChip>(chipOf('开发')).selected, isFalse);
+    await tester.enterText(customField(0), '本地容器');
+    await tester.pump();
+
+    // Tapping an option collapses the input and drops its text.
+    await tester.tap(chipOf('生产'));
+    await tester.pump();
+    expect(customField(0), findsNothing);
+    // 生产 was picked by that tap...
+    expect(tester.widget<FilterChip>(chipOf('生产')).selected, isTrue);
+
+    // ...and re-expanding custom clears it again (mutual exclusion), with
+    // the input coming back empty.
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    expect(tester.widget<FilterChip>(chipOf('生产')).selected, isFalse);
+    expect(
+      tester.widget<TextField>(customField(0)).controller!.text,
+      isEmpty,
+    );
+
+    // Tapping the custom chip again is the second collapse path: it must
+    // clear too, so a later re-expand comes back empty (no hidden state).
+    await tester.enterText(customField(0), '临时脚本');
+    await tester.pump();
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    expect(customField(0), findsNothing);
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(customField(0)).controller!.text,
+      isEmpty,
+    );
+
+    // Custom open but blank: blank text is not an answer (R3), so this is
+    // the no-answer content.
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {'answers': {}});
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('custom input takes focus on the frame after expanding', (
+    tester,
+  ) async {
+    await pumpQuestions(tester, [envQuestion]);
+
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    await tester.pump();
+    // Explicit next-frame focus — `autofocus` loses the race against slow
+    // OEM IME startup (Xiaomi/HyperOS): the show-keyboard request lands
+    // before the IME is ready and is dropped.
+    expect(
+      tester.widget<TextField>(customField(0)).focusNode!.hasFocus,
+      isTrue,
+    );
+  });
+
+  testWidgets('custom text submits verbatim as its label and value', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [envQuestion]);
+
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    await tester.enterText(customField(0), '本地容器');
+    await tester.pump();
+    expect(find.text('已答 1/1'), findsOneWidget);
+
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {
+      'answers': {'选择环境': '本地容器'},
+      'answer_0': '本地容器',
+      'answer': '本地容器',
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('multi custom input coexists with the checked options', (
+    tester,
+  ) async {
+    final gateway = await pumpQuestions(tester, [extrasQuestion]);
+
+    await tester.tap(chipOf('Lint'));
+    await tester.pump();
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    // Multi-select: custom is an extra — Lint stays checked next to it.
+    expect(tester.widget<FilterChip>(chipOf('Lint')).selected, isTrue);
+    await tester.enterText(customField(0), '冒烟脚本');
+    await tester.pump();
+    expect(find.text('已答 1/1'), findsOneWidget);
+
+    // Both go into the answer array together.
+    await tester.tap(submitKey);
+    await tester.pump();
+    final call = gateway.calls
+        .where((c) => c.$1 == 'resolveInteraction')
+        .toList()
+        .single;
+    expect(call.$2[3], {
+      'answers': {'附加组件': 'Lint, 冒烟脚本'},
+      'answer_0': ['lint', '冒烟脚本'],
+      // Single-question form mirrors answer_0 into the flat answer.
+      'answer': ['lint', '冒烟脚本'],
+    });
+    expect(call.$2[4], 'accept');
+  });
+
+  testWidgets('busy disables chips and input; submit arrow becomes a spinner', (
+    tester,
+  ) async {
+    await pumpQuestions(
+      tester,
+      [extrasQuestion],
+      gateway: _HoldResolveGateway(),
+    );
+
+    await tester.tap(chipOf('Lint'));
+    await tester.pump();
+    await tester.tap(chipOf('自定义回答'));
+    await tester.pump();
+    await tester.enterText(customField(0), '冒烟');
+    await tester.tap(submitKey);
+    await tester.pump(); // resolve never answers → busy frame
+
+    // The ↑ key swapped its arrow for a spinner.
+    expect(
+      find.descendant(
+        of: submitKey,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: submitKey,
+        matching: find.byIcon(Icons.arrow_upward),
+      ),
+      findsNothing,
+    );
+    // Every control is disabled while the resolve is in flight.
+    expect(tester.widget<FilterChip>(chipOf('Lint')).onSelected, isNull);
+    expect(tester.widget<FilterChip>(chipOf('自定义回答')).onSelected, isNull);
+    expect(tester.widget<TextField>(customField(0)).enabled, isFalse);
   });
 
   Map<String, dynamic> hookReviewInteraction() => {

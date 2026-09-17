@@ -84,6 +84,8 @@ class RecordingConversationTransport implements ConversationTransport {
         interactionId,
         optionId,
         content,
+        // Questions-submit path asserts the explicit accept action.
+        action,
       ]);
 
   @override

@@ -1391,28 +1391,30 @@ class _ChatPageState extends State<ChatPage> {
             animation: (state == null)
               ? widget.gateway
               : Listenable.merge([state, widget.gateway]),
-            builder: (context, _) => _contentCol(
-              _InputBar(
-                controller: _inputController,
-                sending: _sending,
-                hasAttachments: _pendingFiles.isNotEmpty,
-                isDraft: _sessionId == null,
-                state: state,
-                prep: _prep,
-                draftConfig: _draftConfig,
-                gateway: widget.gateway,
-                sessionId: _sessionId,
-                feed: state == null ? null : _feed,
-                subagentConfirmWindow: widget.turnFooterConfirmWindow,
-                onSend: _send,
-                onAttach: _pickFiles,
-                onSkills: _openSkillsPicker,
-                onModelSheet: _showModelSheet,
-                onUsage: _showUsageSheet,
-                onSubagents: _showSubagentSheet,
-              ),
-              maxWidth: _kComposerColumnWidth,
-            ),
+            builder: (context, _) {
+              return _contentCol(
+                _InputBar(
+                  controller: _inputController,
+                  sending: _sending,
+                  hasAttachments: _pendingFiles.isNotEmpty,
+                  isDraft: _sessionId == null,
+                  state: state,
+                  prep: _prep,
+                  draftConfig: _draftConfig,
+                  gateway: widget.gateway,
+                  sessionId: _sessionId,
+                  feed: state == null ? null : _feed,
+                  subagentConfirmWindow: widget.turnFooterConfirmWindow,
+                  onSend: _send,
+                  onAttach: _pickFiles,
+                  onSkills: _openSkillsPicker,
+                  onModelSheet: _showModelSheet,
+                  onUsage: _showUsageSheet,
+                  onSubagents: _showSubagentSheet,
+                ),
+                maxWidth: _kComposerColumnWidth,
+              );
+            },
           ),
         ],
       ),
@@ -5034,6 +5036,12 @@ class _InteractionCardState extends State<_InteractionCard> {
     final options = payload['options'];
     final questions = payload['questions'];
     final freeText = payload['freeText'] == true;
+    // Official web parity: a questions form replaces the free-text row —
+    // each question carries its own custom-answer input, so a second input
+    // would only blur which field answers what. The plain input stays for
+    // freeText-only interactions (no questions): their only answering
+    // channel.
+    final hasQuestions = questions is List && questions.isNotEmpty;
 
     final title = kind == 'permission'
         ? trP(context, 'chat.interact.permission', [
@@ -5115,10 +5123,10 @@ class _InteractionCardState extends State<_InteractionCard> {
             _QuestionsView(
               questions: questions.cast<Map>(),
               busy: _busy,
-              onResolve: (question, selected) =>
-                  _resolve(content: {question: selected}),
+              onResolve: (content) =>
+                  _resolve(content: content, action: 'accept'),
             ),
-          if (freeText)
+          if (freeText && !hasQuestions)
             Row(
               children: [
                 Expanded(
@@ -5432,11 +5440,13 @@ class _HookReviewItem extends StatelessWidget {
 }
 
 /// Renders a form-style `userInput` interaction (the `questions` payload):
-/// the current question (by `currentQuestionIndex`) with its options.
-class _QuestionsView extends StatelessWidget {
+/// every question with its options. Selections stay local per question and
+/// only the explicit ↑ submit sends the full official-shape content
+/// (`buildBotElicitationContent`: answers text keys + answer_N + accept).
+class _QuestionsView extends StatefulWidget {
   final List<Map> questions;
   final bool busy;
-  final void Function(String question, List<String> selected) onResolve;
+  final void Function(Map<String, dynamic> content) onResolve;
 
   const _QuestionsView({
     required this.questions,
@@ -5445,56 +5455,272 @@ class _QuestionsView extends StatelessWidget {
   });
 
   @override
+  State<_QuestionsView> createState() => _QuestionsViewState();
+}
+
+class _QuestionsViewState extends State<_QuestionsView> {
+  /// Collected option values per question index — nothing resolves until
+  /// the explicit submit.
+  final Map<int, List<String>> _selections = {};
+
+  /// Questions with the inline custom-answer input expanded.
+  final Set<int> _customOpen = {};
+
+  /// One controller per question, created eagerly so the inline input can
+  /// mount/unmount freely; a collapse always clears its text (no hidden
+  /// state survives a collapse).
+  final Map<int, TextEditingController> _customControllers = {};
+
+  /// One focus node per question, paired with the controller. Focus is
+  /// requested explicitly one frame after the input mounts — `autofocus`
+  /// fires while the OEM IME (notably Xiaomi/HyperOS) is still starting and
+  /// the show-keyboard request gets dropped.
+  final Map<int, FocusNode> _customFocusNodes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (var i = 0; i < widget.questions.length; i++) {
+      final controller = TextEditingController();
+      // Live rebuild while typing so the answered counter tracks the text.
+      controller.addListener(() {
+        if (mounted) setState(() {});
+      });
+      _customControllers[i] = controller;
+      _customFocusNodes[i] = FocusNode();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _customControllers.values) {
+      controller.dispose();
+    }
+    for (final node in _customFocusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Unified toggle: tapping the picked option deselects it (single-select
+  /// may return to "nothing picked"), tapping another single-select option
+  /// re-chooses. Any option tap collapses the custom input and drops its
+  /// text — single-select options and the custom answer are mutually
+  /// exclusive.
+  void _toggleOption(int index, Map question, String value) {
+    setState(() {
+      _closeCustom(index);
+      final selected = _selections.putIfAbsent(index, () => []);
+      if (question['multiSelect'] == true) {
+        // Set semantics: a duplicate toggle must not grow the list.
+        selected.contains(value) ? selected.remove(value) : selected.add(value);
+      } else if (selected.contains(value)) {
+        selected.remove(value);
+      } else {
+        selected
+          ..clear()
+          ..add(value);
+      }
+    });
+  }
+
+  /// Custom chip: expands the inline input and focuses it on the next frame
+  /// (see [_customFocusNodes] for why not `autofocus`); tapping again
+  /// collapses and clears. Multi-select keeps custom as an extra coexisting
+  /// answer; single-select clears the picked option first.
+  void _toggleCustom(int index, Map question) {
+    setState(() {
+      if (_customOpen.contains(index)) {
+        _closeCustom(index);
+        return;
+      }
+      if (question['multiSelect'] != true) _selections[index]?.clear();
+      _customOpen.add(index);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _customOpen.contains(index)) {
+        _customFocusNodes[index]?.requestFocus();
+      }
+    });
+  }
+
+  /// Collapse + clear in one place so every collapse path drops the text.
+  void _closeCustom(int index) {
+    if (_customOpen.remove(index)) _customControllers[index]?.clear();
+  }
+
+  /// A question's answer: selected option values ∪ (custom input open with
+  /// non-blank text ? [text] : ∅) — blank text is not an answer.
+  List<String> _answersOf(int index) {
+    final answer = List<String>.of(_selections[index] ?? const []);
+    if (_customOpen.contains(index)) {
+      final text = _customControllers[index]!.text.trim();
+      if (text.isNotEmpty) answer.add(text);
+    }
+    return answer;
+  }
+
+  /// Official `buildBotElicitationContent` shape: `answers` keyed by question
+  /// text with comma-joined option labels, `answer_N` carrying option values
+  /// (scalar for single-select, list for multiSelect), `answer` only for the
+  /// single-question form. Custom text joins verbatim (it is its own label).
+  /// Unanswered questions are silently skipped; nothing answered yields just
+  /// the empty `answers` map (the explicit "no answer" submit).
+  Map<String, dynamic> _buildContent() {
+    final content = <String, dynamic>{};
+    final answers = <String, String>{};
+    for (var i = 0; i < widget.questions.length; i++) {
+      final answer = _answersOf(i);
+      if (answer.isEmpty) continue;
+      final q = widget.questions[i];
+      final multi = q['multiSelect'] == true;
+      final options = (q['options'] as List?) ?? const [];
+      String labelOf(String value) {
+        for (final o in options) {
+          if (o is Map && '${o['value']}' == value) {
+            return '${o['label'] ?? o['value'] ?? value}';
+          }
+        }
+        return value;
+      }
+
+      answers['${q['label'] ?? q['question'] ?? q['value'] ?? 'answer_$i'}'] =
+          answer.map(labelOf).join(', ');
+      content['answer_$i'] = multi ? answer : answer.first;
+    }
+    content['answers'] = answers;
+    if (widget.questions.length == 1 && content.containsKey('answer_0')) {
+      content['answer'] = content['answer_0'];
+    }
+    return content;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final answered = [
+      for (var i = 0; i < widget.questions.length; i++)
+        if (_answersOf(i).isNotEmpty) i,
+    ].length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < questions.length; i++)
+        for (var i = 0; i < widget.questions.length; i++)
           _QuestionItem(
             index: i,
-            question: questions[i],
-            busy: busy,
-            onSelect: (selected) =>
-                onResolve('${questions[i]['value'] ?? 'answer_$i'}', selected),
+            question: widget.questions[i],
+            busy: widget.busy,
+            selected: _selections[i] ?? const [],
+            customOpen: _customOpen.contains(i),
+            customController: _customControllers[i]!,
+            customFocusNode: _customFocusNodes[i]!,
+            onToggleOption: (value) =>
+                _toggleOption(i, widget.questions[i], value),
+            onToggleCustom: () => _toggleCustom(i, widget.questions[i]),
           ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Answered counter, only once something is answered.
+                if (answered > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 9),
+                    child: Text(
+                      trP(context, 'chat.interact.answered', [
+                        '$answered',
+                        '${widget.questions.length}',
+                      ]),
+                      style: ZType.caption.copyWith(
+                        color: ZInk.faint(context),
+                      ),
+                    ),
+                  ),
+                // ↑ submit: the composer send key's squircle, bottom-right of
+                // the card mirroring the composer. Always tappable — nothing
+                // picked sends the explicit "no answer" content; busy is the
+                // one disabled/spinner state.
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Tooltip(
+                    message: tr(context, 'chat.interact.submitAnswers'),
+                    child: Material(
+                      color: widget.busy
+                          ? ZColors.sky500.withValues(alpha: 0.75)
+                          : ZColors.sky500,
+                      borderRadius: BorderRadius.circular(ZRadius.mini),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(ZRadius.mini),
+                        onTap: widget.busy
+                            ? null
+                            : () => widget.onResolve(_buildContent()),
+                        child: Center(
+                          child: widget.busy
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.arrow_upward,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _QuestionItem extends StatefulWidget {
+class _QuestionItem extends StatelessWidget {
   final int index;
   final Map question;
   final bool busy;
-  final void Function(List<String> selected) onSelect;
+  final List<String> selected;
+  final bool customOpen;
+  final TextEditingController customController;
+  final FocusNode customFocusNode;
+  final void Function(String value) onToggleOption;
+  final void Function() onToggleCustom;
 
   const _QuestionItem({
     required this.index,
     required this.question,
     required this.busy,
-    required this.onSelect,
+    required this.selected,
+    required this.customOpen,
+    required this.customController,
+    required this.customFocusNode,
+    required this.onToggleOption,
+    required this.onToggleCustom,
   });
 
   @override
-  State<_QuestionItem> createState() => _QuestionItemState();
-}
-
-class _QuestionItemState extends State<_QuestionItem> {
-  final List<String> _selected = [];
-
-  @override
   Widget build(BuildContext context) {
-    final q = widget.question;
+    final q = question;
     final label = q['label'] ?? q['question'] ?? q['value'] ?? '';
     final options = q['options'];
-    final multi = q['multiSelect'] == true;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${widget.index + 1}. $label',
+            '${index + 1}. $label',
             style: ZType.sub.copyWith(height: 1.4, color: ZInk.solid(context)),
           ),
           if (q['description'] != null)
@@ -5505,7 +5731,7 @@ class _QuestionItemState extends State<_QuestionItem> {
                 style: ZType.caption.copyWith(color: ZInk.faint(context)),
               ),
             ),
-          if (options is List && options.isNotEmpty)
+          if (options is List && options.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Wrap(
@@ -5519,44 +5745,39 @@ class _QuestionItemState extends State<_QuestionItem> {
                           '${o['label'] ?? o['value'] ?? ''}',
                           style: ZType.sub,
                         ),
-                        selected: _selected.contains('${o['value']}'),
-                        onSelected: widget.busy
+                        selected: selected.contains('${o['value']}'),
+                        onSelected: busy
                             ? null
-                            : (on) {
-                                setState(() {
-                                  if (multi) {
-                                    if (on) {
-                                      _selected.add('${o['value']}');
-                                    } else {
-                                      _selected.remove('${o['value']}');
-                                    }
-                                  } else {
-                                    _selected
-                                      ..clear()
-                                      ..add('${o['value']}');
-                                  }
-                                });
-                                if (!multi) {
-                                  widget.onSelect(List.of(_selected));
-                                }
-                              },
+                            : (on) => onToggleOption('${o['value']}'),
                       ),
+                  FilterChip(
+                    avatar: const Icon(Icons.edit, size: 13),
+                    label: Text(
+                      tr(context, 'chat.interact.customAnswer'),
+                      style: ZType.sub,
+                    ),
+                    selected: customOpen,
+                    onSelected: busy ? null : (on) => onToggleCustom(),
+                  ),
                 ],
               ),
             ),
-          if (multi)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: widget.busy
-                    ? null
-                    : () => widget.onSelect(List.of(_selected)),
-                child: Text(
-                  tr(context, 'chat.interact.submit'),
+            if (customOpen)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: TextField(
+                  key: ValueKey('askq-custom-$index'),
+                  controller: customController,
+                  focusNode: customFocusNode,
+                  enabled: !busy,
                   style: ZType.sub,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: tr(context, 'chat.interact.customHint'),
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
       ),
     );
