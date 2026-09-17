@@ -270,6 +270,9 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _run(String errorPrefix, Future<dynamic> Function() run) async {
+    // Read the locale before the async gap: [businessErrorCopy] needs it, and
+    // it must not receive a BuildContext.
+    final locale = UiSettingsProvider.of(context)?.locale ?? 'zh-CN';
     try {
       final res = await run();
       if (res is Map &&
@@ -279,8 +282,7 @@ class _ChatPageState extends State<ChatPage> {
         _toast('$errorPrefix: ${res['reasonCode'] ?? res['status']}');
       }
     } catch (e) {
-      final business = businessErrorCopy('$e', () => tr(context, 'common.retryLater'));
-      _toast(business ?? '$errorPrefix: $e');
+      _toast(businessErrorCopy('$e', locale) ?? '$errorPrefix: $e');
     }
   }
 
@@ -1443,25 +1445,29 @@ typedef AssistantPart = ({
 /// 3002/429 限流, 3006 模型不在范围, 3007 验证码, 3008-3010 系统繁忙, 2007 上游
 /// 不可用). When the failure text mentions one, show the official line
 /// instead of the raw transport error.
-String? businessErrorCopy(String errorText, String Function() retryLater) {
+///
+/// Takes a locale (not a BuildContext) so it stays a pure function; the
+/// `chat.bizErr.*` table entries supply the copy.
+String? businessErrorCopy(String errorText, String locale) {
   final m = RegExp(r'\b(1006|1005|3006|3001|3007|3008|3009|3010|3002|2007|429)\b')
       .firstMatch(errorText);
   if (m == null) return null;
-  final copy = {
-    '1006': '登录状态已失效，请重新登录后再试。',
-    '1005': '免费额度已用完，请升级套餐或稍后再试。',
-    '3006': '当前模型不在你的套餐范围内，请更换模型。',
-    '3001': '请求参数无效，请重试或更换模型。',
-    '3007': '触发验证码校验，请在桌面端完成验证后重试。',
-    '3008': '系统繁忙，请稍后重试或升级套餐。',
-    '3009': '系统繁忙，请稍后重试或升级套餐。',
-    '3010': '系统繁忙，请稍后重试或升级套餐。',
-    '3002': '请求被限流，请稍后重试。',
-    '2007': '上游服务暂不可用，请稍后重试。',
-    '429': '请求被限流，请稍后重试。',
+  final key = {
+    '1006': 'chat.bizErr.loginExpired',
+    '1005': 'chat.bizErr.quotaExhausted',
+    '3006': 'chat.bizErr.modelNotInPlan',
+    '3001': 'chat.bizErr.invalidParams',
+    '3007': 'chat.bizErr.verificationRequired',
+    '3008': 'chat.bizErr.serviceBusy',
+    '3009': 'chat.bizErr.serviceBusy',
+    '3010': 'chat.bizErr.serviceBusy',
+    '3002': 'chat.bizErr.rateLimited',
+    '2007': 'chat.bizErr.upstreamUnavailable',
+    '429': 'chat.bizErr.rateLimited',
   }[m.group(1)];
-  if (copy == null) return null;
-  return '$copy (${retryLater.call()})';
+  if (key == null) return null;
+  final retryLater = trLocale(locale, 'common.retryLater');
+  return '${trLocale(locale, key)} ($retryLater)';
 }
 
 /// Splits an assistant-turn group into ORDERED parts — consecutive
@@ -3485,7 +3491,9 @@ class _BackgroundWorksBar extends StatelessWidget {
                   child: Text(
                     trP(context, 'chat.bgWorks', [
                       '${plainWorks.length}',
-                      plainWorks.map((w) => w['title'] ?? w['kind']).join('、'),
+                      plainWorks
+                          .map((w) => w['title'] ?? w['kind'])
+                          .join(tr(context, 'chat.bgWorks.sep')),
                     ]),
                     style: ZType.caption.copyWith(color: ZInk.soft(context)),
                     maxLines: 1,

@@ -6,6 +6,7 @@ import '../state/scheduled_store.dart';
 import 'automations_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
+import 'widgets/device_name.dart';
 import 'widgets/dropdown_field.dart';
 
 /// Combined scheduling hub: server-side device automations on top, local
@@ -164,7 +165,10 @@ class _ScheduledPageState extends State<ScheduledPage> {
           ),
           items: [
             for (final d in devices)
-              DropdownMenuItem(value: d.id, child: Text(d.label)),
+              DropdownMenuItem(
+                value: d.id,
+                child: Text(deviceDisplayName(context, d.label)),
+              ),
           ],
           onChanged: (v) => setState(() => _autoDeviceId = v ?? _autoDeviceId),
         ),
@@ -200,7 +204,8 @@ class _ScheduledPageState extends State<ScheduledPage> {
                       Icon(Icons.schedule, size: 14, color: color),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(m.deviceLabel,
+                        child: Text(
+                            deviceDisplayName(context, m.deviceLabel),
                             style: ZType.bodyStrong,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
@@ -341,7 +346,10 @@ class _AddSheetState extends State<_AddSheet> {
                 InputDecoration(labelText: tr(context, 'sched.device')),
             items: [
               for (final d in widget.devices)
-                DropdownMenuItem(value: d.id, child: Text(d.label)),
+                DropdownMenuItem(
+                  value: d.id,
+                  child: Text(deviceDisplayName(context, d.label)),
+                ),
             ],
             onChanged: (v) => setState(() => _deviceId = v ?? _deviceId),
           ),

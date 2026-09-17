@@ -61,3 +61,10 @@ app.*.map.json
 .zcode
 .trellis
 .gitattributes
+
+# Local-only agent notes (kept out of history at the user request, 2026-09-16)
+/AGENTS.md
+
+# Local-only architecture/domain docs (2026-09-17, per user request)
+/CONTEXT.md
+/docs/adr/

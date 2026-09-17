@@ -70,11 +70,11 @@ class _GoalPanelState extends State<GoalPanel> {
         : const [];
   }
 
-  static String _fmtDuration(int seconds) {
+  static String _fmtDuration(BuildContext context, int seconds) {
     final m = seconds ~/ 60;
     final s = seconds % 60;
-    if (m <= 0) return '$s秒';
-    return '$m分${s.toString().padLeft(2, '0')}秒';
+    if (m <= 0) return trP(context, 'chat.time.secOnly', ['$s']);
+    return trP(context, 'chat.time.minSec', ['$m', '$s']);
   }
 
   Future<void> _togglePause(String sessionId, bool paused) async {
@@ -120,7 +120,7 @@ class _GoalPanelState extends State<GoalPanel> {
                   style: ZType.bodyStrong),
               const SizedBox(width: 8),
               if (used > 0)
-                Text(_fmtDuration(used),
+                Text(_fmtDuration(context, used),
                     style: ZType.caption.copyWith(color: ZInk.muted(context))),
               const Spacer(),
               InkWell(
@@ -302,9 +302,10 @@ class _AgentElapsedState extends State<_AgentElapsed> {
     if (started == null) return const SizedBox.shrink();
     final secs =
         max(0, (_now?.millisecondsSinceEpoch ?? 0) - started) ~/ 1000;
-    final m = secs ~/ 60;
-    final s = secs % 60;
-    return Text('已运行 $m分${s.toString().padLeft(2, '0')}秒',
+    return Text(
+        trP(context, 'goalPanel.ranFor', [
+          _GoalPanelState._fmtDuration(context, secs),
+        ]),
         style: ZType.caption.copyWith(color: ZInk.faint(context)));
   }
 }

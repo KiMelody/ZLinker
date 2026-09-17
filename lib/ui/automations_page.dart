@@ -9,13 +9,13 @@ import 'theme.dart';
 import 'ui_settings.dart';
 import 'widgets/dropdown_field.dart';
 
-/// One 定时任务模板 idea (official moreIdeas trio): dictionary key plus
-/// its cron preset and display schedule.
+/// One 定时任务模板 idea (official moreIdeas trio): dictionary key plus its
+/// cron preset. Every display string comes from the table under
+/// `auto.tpl.<key>.*`, so only the key is stored here.
 class _Idea {
   final String key;
-  final String schedule;
   final String cron;
-  const _Idea(this.key, this.schedule, this.cron);
+  const _Idea(this.key, this.cron);
 }
 
 /// Server-side automations of one device (desktop zcode-cron-scheduler).
@@ -139,9 +139,9 @@ class AutomationsPane extends StatefulWidget {
 
 class _AutomationsPaneState extends State<AutomationsPane> {
   static const _templateIdeas = [
-    _Idea('weeklyReview', '每周五 16:00', '0 16 * * 5'),
-    _Idea('meetingPrep', '每周五 16:00', '0 16 * * 5'),
-    _Idea('contentIdeas', '每周一 9:00', '0 9 * * 1'),
+    _Idea('weeklyReview', '0 16 * * 5'),
+    _Idea('meetingPrep', '0 16 * * 5'),
+    _Idea('contentIdeas', '0 9 * * 1'),
   ];
 
   List<AutomationItem> _items = const [];
@@ -395,7 +395,7 @@ Future<void> _pickTemplate() async {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(idea.schedule,
+                  Text(tr(sheetCtx, 'auto.tpl.${idea.key}.schedule'),
                       style:
                           ZType.caption.copyWith(color: ZColors.sky500)),
                   Text(tr(sheetCtx, 'auto.tpl.${idea.key}.desc'),

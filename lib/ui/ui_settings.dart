@@ -318,6 +318,16 @@ const _zh = {
   'chat.compact.failed': '压缩失败',
   'chat.goal.pauseFailed': '暂停目标失败',
   'chat.goal.resumeFailed': '恢复目标失败',
+  // Provider business errors (web `zcode.error.providerBusiness.*`), keyed by
+  // meaning rather than by the numeric code carried in the raw error text.
+  'chat.bizErr.loginExpired': '登录状态已失效，请重新登录后再试。',
+  'chat.bizErr.quotaExhausted': '免费额度已用完，请升级套餐或稍后再试。',
+  'chat.bizErr.modelNotInPlan': '当前模型不在你的套餐范围内，请更换模型。',
+  'chat.bizErr.invalidParams': '请求参数无效，请重试或更换模型。',
+  'chat.bizErr.verificationRequired': '触发验证码校验，请在桌面端完成验证后重试。',
+  'chat.bizErr.serviceBusy': '系统繁忙，请稍后重试或升级套餐。',
+  'chat.bizErr.rateLimited': '请求被限流，请稍后重试。',
+  'chat.bizErr.upstreamUnavailable': '上游服务暂不可用，请稍后重试。',
   'chat.held.title': '有排队中的消息',
   'chat.held.body': '立即发送将清空排队消息并插队执行',
   'chat.held.keep': '排队发送',
@@ -334,6 +344,7 @@ const _zh = {
   'chat.agents.stop': '停止',
   'chat.agents.stopConfirm': '确定停止这个子智能体吗？',
   'chat.bgWorks': '后台任务 \$0 个运行中: \$1',
+  'chat.bgWorks.sep': '、',
   'chat.tool.input': '输入',
   'chat.tool.output': '输出',
   'chat.tool.error': '错误',
@@ -394,6 +405,7 @@ const _zh = {
   'goalPanel.completedN': '已完成 \$0 项',
   'goalPanel.agents': '智能体',
   'goalPanel.agentsRunning': '\$0 运行',
+  'goalPanel.ranFor': '已运行 \$0',
   'chat.queue.autoOn': '自动发送: 开',
   'chat.interact.snooze': '稍后自动继续',
   'chat.bgWorks.cancel': '取消此后台任务',
@@ -820,6 +832,14 @@ const _zh = {
   'notify.offPeak.failed': '闲时任务失败',
   'notify.auto.done': '自动化触发成功',
   'notify.auto.failed': '自动化触发失败',
+  // Android channel name/description. Set once when the channel is first
+  // created; later locale changes do not retitle an existing channel.
+  'notify.channel.tasks.name': '任务事件',
+  'notify.channel.tasks.desc': '任务完成与失败提醒',
+  'notify.channel.offPeak.name': '闲时事件',
+  'notify.channel.offPeak.desc': '闲时任务完成与失败提醒',
+  'notify.channel.automations.name': '自动化结果',
+  'notify.channel.automations.desc': '自动化定时触发的执行结果',
   'settings.checkUpdate': '检查更新',
   'update.latest': '已是最新版本',
   'update.newVersion': '发现新版本 v\$0',
@@ -1067,6 +1087,25 @@ const _en = {
   'chat.compact.failed': 'Compact failed',
   'chat.goal.pauseFailed': 'Pause goal failed',
   'chat.goal.resumeFailed': 'Resume goal failed',
+  // Fallback translations: the official en copy (web
+  // `zcode.error.providerBusiness.*`) is pending a measurement pass — replacing
+  // these values is a table-only change (see gap-matrix.md).
+  'chat.bizErr.loginExpired':
+      'Your session has expired. Sign in again and retry.',
+  'chat.bizErr.quotaExhausted':
+      'Free quota is used up. Upgrade your plan or retry later.',
+  'chat.bizErr.modelNotInPlan':
+      'This model is not in your plan. Switch to another model.',
+  'chat.bizErr.invalidParams':
+      'Invalid request parameters. Retry or switch models.',
+  'chat.bizErr.verificationRequired':
+      'A verification challenge was triggered. Complete it on the desktop '
+      'and retry.',
+  'chat.bizErr.serviceBusy':
+      'Service is busy. Retry later or upgrade your plan.',
+  'chat.bizErr.rateLimited': 'Request was rate limited. Retry later.',
+  'chat.bizErr.upstreamUnavailable':
+      'Upstream service is temporarily unavailable. Retry later.',
   'chat.held.title': 'Queued messages pending',
   'chat.held.body':
       'Sending now clears the queued messages and jumps the queue',
@@ -1084,6 +1123,7 @@ const _en = {
   'chat.agents.stop': 'Stop',
   'chat.agents.stopConfirm': 'Stop this subagent?',
   'chat.bgWorks': '\$0 background tasks running: \$1',
+  'chat.bgWorks.sep': ', ',
   'chat.tool.input': 'Input',
   'chat.tool.output': 'Output',
   'chat.tool.error': 'Error',
@@ -1144,6 +1184,7 @@ const _en = {
   'goalPanel.completedN': '\$0 completed',
   'goalPanel.agents': 'Agents',
   'goalPanel.agentsRunning': '\$0 running',
+  'goalPanel.ranFor': 'Ran for \$0',
   'chat.queue.autoOn': 'Auto-send: on',
   'chat.interact.snooze': 'Auto-continue later',
   'chat.bgWorks.cancel': 'Cancel this background work',
@@ -1593,6 +1634,13 @@ const _en = {
   'notify.offPeak.failed': 'Off-peak task failed',
   'notify.auto.done': 'Automation triggered',
   'notify.auto.failed': 'Automation run failed',
+  // Android channel name/description (see the zh table note).
+  'notify.channel.tasks.name': 'Task events',
+  'notify.channel.tasks.desc': 'Task completion and failure alerts',
+  'notify.channel.offPeak.name': 'Off-peak events',
+  'notify.channel.offPeak.desc': 'Off-peak task completion and failure alerts',
+  'notify.channel.automations.name': 'Automation results',
+  'notify.channel.automations.desc': 'Results of scheduled automation runs',
   'settings.checkUpdate': 'Check for updates',
   'update.latest': 'Up to date',
   'update.newVersion': 'New version v\$0',
@@ -1676,3 +1724,12 @@ const _en = {
       'Draft a few content ideas from verifiable recent industry and project information. Cite the evidence used, label unavailable information, and do not publish or modify external state.',
   'auto.tpl.contentIdeas.schedule': 'Every Monday at 9:00',
 };
+
+/// Test-only views of the two tables: `test/ui_settings_test.dart` asserts they
+/// hold the same key set (the manual alignment contract in spec/ui/i18n.md §3).
+@visibleForTesting
+const Map<String, String> zhTable = _zh;
+
+/// See [zhTable].
+@visibleForTesting
+const Map<String, String> enTable = _en;

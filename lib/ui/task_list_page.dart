@@ -17,6 +17,7 @@ import 'phase_pill.dart';
 import 'remote_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
+import 'widgets/device_name.dart';
 import 'widgets/swipe_actions.dart';
 
 /// Native task list of one device (official mobile layout): a connection
@@ -307,7 +308,7 @@ class _TaskListPageState extends State<TaskListPage> {
               Text(
                 online
                     ? tr(context, 'tasks.banner.onlineSubtitle')
-                    : widget.device.label,
+                    : deviceDisplayName(context, widget.device.label),
                 style: ZType.sub.copyWith(
                   color: online ? ZColors.pillSuccessBg : ZInk.faint(context),
                 ),
@@ -401,7 +402,7 @@ class _TaskListPageState extends State<TaskListPage> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.device.label,
+                      deviceDisplayName(context, widget.device.label),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: ZType.body.copyWith(

@@ -14,6 +14,7 @@ import 'settings_page.dart';
 import 'task_list_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
+import 'widgets/device_name.dart';
 
 /// Home: the device list with live native status. Tap a card to open the
 /// native task list (or WebView fallback), long-term management via the
@@ -292,8 +293,9 @@ class _DevicesPageState extends State<DevicesPage>
       context: context,
       builder: (c) => AlertDialog(
         title: Text(tr(context, 'devices.delete.title')),
-        content:
-            Text(trP(context, 'devices.delete.body', [device.label])),
+        content: Text(trP(context, 'devices.delete.body', [
+          deviceDisplayName(context, device.label),
+        ])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
@@ -546,7 +548,7 @@ class _DevicesPageState extends State<DevicesPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        device.label,
+                        deviceDisplayName(context, device.label),
                         style: ZType.heading,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -590,7 +592,8 @@ class _DevicesPageState extends State<DevicesPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(device.label, style: ZType.heading),
+                    Text(deviceDisplayName(context, device.label),
+                        style: ZType.heading),
                     // The row no longer carries the host (R5): it lives in the
                     // device's own detail surface.
                     if (host.isNotEmpty)
