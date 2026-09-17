@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:zlinker/protocol/automation.dart';
 import 'package:zlinker/protocol/connection_params.dart';
 import 'package:zlinker/state/device_session.dart';
 
@@ -123,6 +124,80 @@ void main() {
         'getAll', 'list', 'get', 'getOptions', 'getDefaults', 'options',
       ]) {
         await tryCall('model-selection', m);
+      }
+    } finally {
+      await session.dispose();
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('live automation production chain (new wire)', () async {
+    if (url == null || url.isEmpty) {
+      // ignore: avoid_print
+      print('ZLINKER_PROBE_URL not set — skipping');
+      return;
+    }
+    final params = RemoteConnectionParams.parse(url);
+    if (params == null) throw StateError('bad url');
+    final session = DeviceSession(deviceId: 'probe12123h', params: params);
+    try {
+      await session.connect();
+      expect(session.status, DeviceStatus.connected, reason: session.error);
+      final port = session.automation;
+
+      // Read side: scheduleRule / lifecycleStatus parsing over real items.
+      final items = await port.list();
+      // ignore: avoid_print
+      print('PROBE automation list=${items.length}');
+      for (final it in items.take(6)) {
+        // ignore: avoid_print
+        print('PROBE item: id=${it.id} trigger=${it.trigger} '
+            'lifecycle=${it.lifecycleStatus} interval=${it.interval} '
+            'unit=${it.intervalUnit} enabled=${it.enabled}');
+      }
+
+      // Create a throwaway interval automation with an anchor, read it
+      // back from list(), then remove it (self-cleaning).
+      const probeTitle = '[probe-delete-me] zlinker wire check';
+      final created = await port.create(const AutomationInput(
+        title: probeTitle,
+        prompt: 'noop probe prompt — safe to delete',
+        trigger: AutomationInput.triggerInterval,
+        interval: 7,
+        intervalUnit: 'day',
+        anchorHour: 9,
+        anchorMinute: 30,
+        thoughtLevel: 'low',
+      ), session.automationScope);
+      // ignore: avoid_print
+      print('PROBE created id=${created.id}');
+      final after = await port.list();
+      final mine = after.where((it) => it.title == probeTitle).toList();
+      for (final it in mine) {
+        // ignore: avoid_print
+        print('PROBE created item: trigger=${it.trigger} '
+            'interval=${it.interval} unit=${it.intervalUnit} '
+            'anchor=${it.raw['scheduleRule']} '
+            'modelSelection=${it.raw['modelSelection']}');
+      }
+      expect(mine, isNotEmpty, reason: 'created probe automation visible');
+      for (final it in mine) {
+        await port.remove(it.id);
+      }
+      final cleaned = await port.list();
+      expect(cleaned.where((it) => it.title == probeTitle), isEmpty,
+          reason: 'probe automation removed');
+
+      // setEnabled chain existence: bogus id must fail with a per-item
+      // error (not Method not found) on 3.12.3's dedicated method.
+      try {
+        await port.setEnabled(
+            'bogus-automation-id', false, session.automationScope);
+        // ignore: avoid_print
+        print('PROBE setEnabled bogus: no error (unexpected but harmless)');
+      } catch (e) {
+        // ignore: avoid_print
+        print('PROBE setEnabled bogus err: $e');
+        expect('$e', isNot(contains('Method not found')));
       }
     } finally {
       await session.dispose();

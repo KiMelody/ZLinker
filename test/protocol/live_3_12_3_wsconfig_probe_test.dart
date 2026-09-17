@@ -139,4 +139,40 @@ void main() {
       await session.dispose();
     }
   }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('live prep production chain', () async {
+    if (url == null || url.isEmpty) {
+      // ignore: avoid_print
+      print('ZLINKER_PROBE_URL not set — skipping');
+      return;
+    }
+    final params = RemoteConnectionParams.parse(url);
+    if (params == null) throw StateError('bad url');
+    final session = DeviceSession(deviceId: 'probe12123f', params: params);
+    try {
+      await session.connect();
+      expect(session.status, DeviceStatus.connected, reason: session.error);
+
+      // Production gateway path: version gate → getTaskConfigOptions +
+      // readWorkspacePresentation → legacy. Config selectors must have data.
+      final prep = await session.prepareWorkspace();
+      // ignore: avoid_print
+      print('PROBE prep options=${prep.configOptions.length} '
+          'slash=${prep.slashCommands.length} '
+          'ids=${prep.configOptions.map((o) => o.id).toList()}');
+      final model = prep.option('model');
+      // ignore: avoid_print
+      print('PROBE prep model candidates=${model?.options.length} '
+          'current=${model?.currentValue}');
+      expect(prep.configOptions, isNotEmpty,
+          reason: 'getTaskConfigOptions should drive the composer config');
+      expect(model?.options, isNotEmpty,
+          reason: 'model selector should list candidates (15 live-fact)');
+      // ignore: avoid_print
+      print('PROBE slashCommands: '
+          '${prep.slashCommands.map((c) => '${c.name}(${c.source})').toList()}');
+    } finally {
+      await session.dispose();
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }
