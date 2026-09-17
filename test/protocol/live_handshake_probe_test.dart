@@ -55,6 +55,23 @@ void main() {
       await Future<void>.delayed(const Duration(seconds: 2));
       // ignore: avoid_print
       print('PROBE sent sequence: $sent');
+
+      // T6 (gap-matrix): do archived tasks appear in the live sessions-index?
+      // Cross-check relay overview archived ids against the subscribed
+      // workspace's live index.
+      final live = session.sessions?.list ?? const [];
+      final liveIds = live.map((e) => e.sessionId).toSet();
+      final relayArchived = session.relayTasks
+          .where((t) => t['archived'] == true)
+          .toList();
+      // ignore: avoid_print
+      print('PROBE live sessions-index: total=${live.length} '
+          'archivedFlagged='
+          '${live.where((e) => e.raw['archived'] == true).length}');
+      // ignore: avoid_print
+      print('PROBE archived (T6): relay=${relayArchived.length} '
+          'alsoInLiveIndex='
+          '${relayArchived.where((t) => liveIds.contains(t['taskId'])).length}');
     } finally {
       await session.dispose();
     }

@@ -70,7 +70,7 @@
 | T3 任务行操作菜单 | pin/unpin、rename、delete、archive/unarchive、markAsUnread、resume | 长按菜单仅 停止/暂停/继续;置顶/重命名/归档/未读只在 chat「更多」菜单 | 部分 | **P0** || ✅ |
 | T4 删除确认弹窗 | `taskDeleteTitle/Description`(不可恢复警告) | 无删除入口故无弹窗 | 缺失 | **P0**(随 T2) || ✅ |
 | T5 实时任务变更 | `onDynamicWorkspaceEvent(workspace_task_list_changed)`(reason: task_created 等)+ relay workspace-list-updated | 无订阅;列表不实时 | 缺失 | **P0** || ✅ |
-| T6 归档视图数据源 | `listArchivedTasks` | `_showArchived` 过滤现有列表;归档任务是否出现在 sessions-index 未证实 | 部分(待核实后定) | **P0** || ✅ |
+| T6 归档视图数据源 | `listArchivedTasks` | 归档视图走 relay(`Dg.archived`);**已实测(09-17 探针,桌面 3.12.1)**:live sessions-index **含已归档会话但不带 archived 字段**,`listArchivedTasks` 与 relay 归档位互证、归档推送 ≤2s → TaskDirectory 裁定 relay 独占归档位,live 覆盖只置不清 | 一致(已实证) | ~~P0~~ || ✅ |
 | T7 整理偏好持久化 | localStorage `zcode-web-remote-control-mobile-task-home-preferences`,默认 `{organizeBy:'workspace', sortBy:'updated'}` | organize 面板仅 setState 内存态,重启丢失(默认值恰好一致) | 部分 | P1 || ✅ |
 | T8 状态标签 changeStats | `+{added} -{removed}` 文件变更统计标签 | 无 | 缺失 | P1 | |
 | T9 状态标签 等待确认 | `permissionTag/userInputTag="等待确认"`(任务卡上) | 无 | 缺失 | P1 || ✅ |
