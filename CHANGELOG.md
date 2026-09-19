@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-09-19
+
+### Added
+
+- **3.12.3 desktop protocol adaptation**: composer config source migrated
+  to `getTaskConfigOptions` (workspace-config snapshot as secondary),
+  scheduled-task automation with dedicated start/stop methods and dual-field
+  trigger encoding, off-peak lifecycle position params with version gating
+  and structured error classes, slash commands via `readWorkspacePresentation`,
+  model-settings entry gating, and task-list enhancements (read-only group
+  view, relay-authoritative archived state, per-task token usage).
+- **Workspace hook review**: V4 handshake capability declaration with an
+  interactive review card for incoming workspace hooks.
+- **Offline replayable queue** (`web-remote-replayable`): bridge-level send
+  failures queue locally and replay on recovery, styled after the official
+  pendingCommands card (retry + undo per message).
+- **ask question interaction overhaul**: per-question custom input, toggle
+  to cancel, ↑ to submit; composer hidden while a question is pending and
+  interaction cards rebuilt from the message stream after resubscribe.
+- **Sub-agent end-to-end** with official copy, drill-in detail page and live
+  progress, plus a chat scroll-to-bottom button. **Android foreground
+  keep-alive** service (`specialUse`, OEM-adaptive visibility, settings
+  entry) with task-completion notification reliability (child-session false
+  positives, phase-snapshot kill-process replay, repeat hysteresis).
+
+### Changed
+
+- Usage/quota alignment with the official client: reset semantics
+  (three-condition visibility, opportunity-expiry clock), 3.12.3 entitlement
+  full params (`app_version` gating + `accountAccess`), A2 main-limit
+  projection on the remaining-quota card, light-theme usage tokens.
+- State-layer consolidation (T6): Entitlement/TaskDirectory/ChatGateway/
+  tool-row semantics each encoded in one place, with page-anchor tests.
+
+### Fixed
+
+- Session-subscription stalls: ack watchdog, loading-state bridge hint and
+  resubscribe generation guard.
+- Task-row workspace attribution fallback (scope-mismatch phantom-live rows
+  failing with sessionNotFound).
+- Usage page load-failure visibility, Etc/GMT timezone mapping and 90d enum
+  close-out; edit-resend i18n key; keyboard overflow; light completion pill
+  values; model-switch timeout optimism; hardcoded-copy purge with
+  parity/CJK gates.
+
 ## [1.11.0] - 2026-09-15
 
 ### Added
