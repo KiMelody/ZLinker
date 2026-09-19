@@ -286,6 +286,18 @@ class RecordingChatGateway extends ChangeNotifier implements ChatGateway {
   @override
   Future<List<SkillEntry>> skills() async => const [];
 
+  /// Programmed [ChatGateway.modelProviderCatalog] fallback catalog (the
+  /// chat config sheet's model-provider fallback, PRD 09-19); empty
+  /// default keeps the sheet's degraded text.
+  List<Map<String, dynamic>> modelProviderCatalogResult = const [];
+  int modelProviderCatalogCalls = 0;
+
+  @override
+  Future<List<Map<String, dynamic>>> modelProviderCatalog() async {
+    modelProviderCatalogCalls++;
+    return modelProviderCatalogResult;
+  }
+
   @override
   String? chatWorkspaceId = 'ws-1';
   @override

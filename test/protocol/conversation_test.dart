@@ -1102,6 +1102,168 @@ void main() {
       });
     });
   });
+
+  group('subscribe stall defenses', () {
+    late _ManualChannels channels;
+    late List<String> logs;
+
+    ConversationTransport stalledTransport() {
+      logs = [];
+      channels = _ManualChannels();
+      return ConversationTransport(
+        session: _FakeBridgeSession(channels.client),
+        scope: {'workspacePath': '/repo'},
+        // Shrunk watchdog bound: protocol tests drive real timers, no
+        // fake_async (see spec/protocol/protocol-guidelines.md §7).
+        subscribeAckTimeout: const Duration(milliseconds: 100),
+        onLog: (line) => logs.add(line),
+      );
+    }
+
+    void answerSubscribe(String subscriptionId, String logEpoch, {int at = 0}) =>
+        channels.answer(
+          'subscribeConversationV4',
+          {
+            'ack': {'subscriptionId': subscriptionId, 'logEpoch': logEpoch},
+          },
+          at: at,
+        );
+
+    test('watchdog resubscribes a stalled ack; its late ack never wins',
+        () async {
+      final transport = stalledTransport();
+      final done = transport.subscribe('s1');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(channels.count('subscribeConversationV4'), 1);
+
+      // Before the bound: no watchdog fire, no second subscribe.
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(channels.count('subscribeConversationV4'), 1);
+
+      // Past the bound: the stalled attempt is abandoned and resubscribed.
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      expect(channels.count('subscribeConversationV4'), 2);
+      expect(logs.join('\n'), contains('subscribe ack stalled'));
+
+      // The new attempt acks and adopts the subscription…
+      answerSubscribe('sub-2', 'epoch-fresh', at: 1);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // …then the abandoned attempt acks late — dropped, no takeover.
+      answerSubscribe('sub-1', 'epoch-stale', at: 0);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final sub = await done;
+      expect(sub.subscriptionId, 'sub-2');
+      expect(sub.state.logEpoch, 'epoch-fresh');
+      expect(logs.join('\n'), contains('dropped late subscribe ack'));
+      // No extra resubscribe was triggered by the dropped ack.
+      expect(channels.count('subscribeConversationV4'), 2);
+      await sub.dispose();
+    });
+
+    test('bridge recovery racing an in-flight subscribe keeps the newer attempt',
+        () async {
+      final transport = stalledTransport();
+      final done = transport.subscribe('s1');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(channels.count('subscribeConversationV4'), 1);
+
+      // The bridge rebuilds before the first ack: the recovery resubscribe
+      // races the still-pending attempt (generation guard's live race).
+      transport.session.recovered.value++;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(channels.count('subscribeConversationV4'), 2);
+
+      // New attempt acks first; the abandoned attempt's ack lands after.
+      answerSubscribe('sub-2', 'epoch-fresh', at: 1);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      answerSubscribe('sub-1', 'epoch-stale', at: 0);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final sub = await done;
+      expect(sub.subscriptionId, 'sub-2');
+      expect(sub.state.logEpoch, 'epoch-fresh');
+      expect(logs.join('\n'), contains('dropped late subscribe ack'));
+      await sub.dispose();
+    });
+
+    test('fast ack: single subscribe, id adopted, no watchdog noise', () async {
+      final transport = stalledTransport();
+      final done = transport.subscribe('s1');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      answerSubscribe('sub-1', 'epoch-1');
+      final sub = await done;
+
+      expect(sub.subscriptionId, 'sub-1');
+      // Well past the watchdog bound: nothing resubscribed, nothing logged.
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+      expect(channels.count('subscribeConversationV4'), 1);
+      final joined = logs.join('\n');
+      expect(joined, isNot(contains('subscribe ack stalled')));
+      expect(joined, isNot(contains('dropped late subscribe ack')));
+      expect(joined, isNot(contains('resubscribe failed')));
+      await sub.dispose();
+    });
+  });
+}
+
+/// Channel client with test-driven responses: handshake (and unsubscribe)
+/// calls answer immediately; every other call parks as (method, id) until
+/// [answer] completes the [at]-th (0-based from oldest) parked call of that
+/// method — how subscribe-stall races are driven.
+class _ManualChannels {
+  final parked = <(String, int)>[];
+
+  /// Every call handed to [ChannelClient] (parked or auto-answered) —
+  /// [count] reads this so answered calls still count.
+  final sent = <String>[];
+  late final ChannelClient client;
+
+  _ManualChannels() {
+    late final ChannelClient c;
+    c = ChannelClient(sendBody: (body) {
+      final reader = ValueReader(body);
+      final header = decodeValue(reader) as List;
+      final method = '${header[3]}';
+      final id = header[1] as int;
+      sent.add(method);
+      switch (method) {
+        case 'helloConversationV4':
+          _reply(c, id, {'connectionId': 'conn-test'});
+        case 'initializeConversationV4':
+        case 'unsubscribeConversationV4':
+          _reply(c, id, const {'status': 'accepted'});
+        default:
+          parked.add((method, id));
+      }
+    });
+    final init = ValueWriter();
+    encodeValue(init, [ChannelClient.resInitialize, 0]);
+    c.handleMessage(init.toBytes());
+    client = c;
+  }
+
+  void _reply(ChannelClient c, int id, Object? payload) {
+    final w = ValueWriter();
+    encodeValue(w, [ChannelClient.resPromiseSuccess, id]);
+    encodeValue(w, payload);
+    c.handleMessage(w.toBytes());
+  }
+
+  void answer(String method, Object? payload, {int at = 0}) {
+    var seen = 0;
+    for (var i = 0; i < parked.length; i++) {
+      if (parked[i].$1 != method) continue;
+      if (seen++ != at) continue;
+      final (_, id) = parked.removeAt(i);
+      _reply(client, id, payload);
+      return;
+    }
+    fail('no parked call #$at for $method');
+  }
+
+  int count(String method) => sent.where((m) => m == method).length;
 }
 
 /// Builds a [ConversationTransport] over a hand-rolled bridge whose channel
