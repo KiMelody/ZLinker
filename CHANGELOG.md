@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-09-20
+
+### Added
+
+- **3.14 desktop adaptation**: off-peak take-number semantics — four-state
+  card (official copy) via gated `getCodingPlanSupport` /
+  `getTakeNumberAvailability`; model-list recovery via gated
+  `model-selection.getView` mapped onto the legacy catalog shape. Older
+  desktops unchanged.
+- **Quota watch notifications**: persistent RemoteViews ring notification
+  (theme-aware, whitelist-safe views), chat bottleneck alert (token/credit
+  filtered — the TIME_LIMIT tool quota never drives it), one-tap reset from
+  the notification (UUID-v4 request, dual-path intent), four settings
+  toggles, and user-configurable coupon-expiry lead times (5h pool 5-60 min,
+  weekly pool 5-10 h).
+
+### Fixed
+
+- Quota semantics: reset requests now use UUID v4 instead of the colliding
+  `3001`, the 24h reset-clock condition was inverted, and the weekly-expiry
+  hint no longer fires in dead weeks.
+- Chat keyboard triple-fix: blank band between composer and IME (status
+  strip floats in the message stack instead of splitting a loose flex
+  share), keyboard showing then instantly hiding (constant-type strip slots
+  keep the composer's Element alive across IME inset frames), and messages
+  not riding up with the keyboard plus keyboard-animation jank
+  (viewport-shrink bottom-pinning + IME inset dependency narrowed to a
+  probe above the Scaffold — zero full-page rebuilds per animation frame).
+
 ## [1.12.0] - 2026-09-19
 
 ### Added
