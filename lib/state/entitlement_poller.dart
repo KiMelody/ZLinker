@@ -36,6 +36,11 @@ class Limit {
     final t = raw['nextResetTime'];
     return t is num ? t.toInt() : null;
   }
+
+  /// The reset window this row maps onto ([quotaWindowKindOf] — the same
+  /// mapping poolVisible uses); null when the row's unit/number shape
+  /// matches no pool window.
+  QuotaWindowKind? get kind => quotaWindowKindOf(raw);
 }
 
 /// One pool the projection credited as resettable: the reset type (the
@@ -141,11 +146,32 @@ class EntitlementView {
   /// row ranks: the card then falls back to the top-level `remaining`
   /// mirror (the TIME_LIMIT aggregate whose count/bar mislead as
   /// 「0 / 100%」 on plans without a monthly tool quota).
-  Limit? get primaryLimit {
+  ///
+  /// Deliberately NOT type-filtered (the A2 card mirrors the official
+  /// panel, where the monthly tool quota is a legitimate headline); the
+  /// chat-facing bottleneck below is the filtered variant.
+  Limit? get primaryLimit => _rankMostTense([
+        for (final e in _limits ?? const [])
+          if (e is Map) Limit(e.cast<String, dynamic>()),
+      ]);
+
+  /// Chat bottleneck projection (quota watch, PRD 09-19): the most-tense
+  /// row among the token/credit types — same ranking as [primaryLimit],
+  /// but filtered to [_tokenLimitTypes] so a TIME_LIMIT row (the monthly
+  /// built-in tool quota that does not limit chat) can never drive the
+  /// low-quota alert. Null when no token/credit row ranks.
+  Limit? get chatBottleneckLimit => _rankMostTense([
+        for (final e in _limits ?? const [])
+          if (e is Map && _tokenLimitTypes.contains(e['type']))
+            Limit(e.cast<String, dynamic>()),
+      ]);
+
+  /// Shared ranking of [primaryLimit] / [chatBottleneckLimit]: highest
+  /// used percent, ties broken toward the nearest window rollover (a row
+  /// without one loses).
+  static Limit? _rankMostTense(Iterable<Limit> candidates) {
     Limit? best;
-    for (final e in _limits ?? const []) {
-      if (e is! Map) continue;
-      final candidate = Limit(e.cast<String, dynamic>());
+    for (final candidate in candidates) {
       final used = candidate.percentage;
       if (used == null) continue;
       final bestUsed = best?.percentage;
@@ -161,6 +187,22 @@ class EntitlementView {
       }
     }
     return best;
+  }
+
+  /// The plan's window row for a reset kind — the same matching
+  /// [poolVisible] applies ([Limit.kind]): five-hour = token row
+  /// `unit 3 number 5`, week = token row `unit 6`. Null when the plan has
+  /// no such row (a V1 plan's missing weekly window).
+  Limit? windowRow(QuotaWindowKind kind) {
+    final limits = _limits;
+    if (limits == null) return null;
+    for (final e in limits) {
+      if (e is! Map) continue;
+      if (!_tokenLimitTypes.contains(e['type'])) continue;
+      final candidate = Limit(e.cast<String, dynamic>());
+      if (candidate.kind == kind) return candidate;
+    }
+    return null;
   }
 
   /// `provider.id` of the snapshot — the reset controller's scope
@@ -217,8 +259,7 @@ class EntitlementView {
   static String fmtResetClock(DateTime expiry) {
     final hh = expiry.hour.toString().padLeft(2, '0');
     final mm = expiry.minute.toString().padLeft(2, '0');
-    if (expiry
-        .isAfter(DateTime.now().subtract(const Duration(hours: 24)))) {
+    if (expiry.isBefore(DateTime.now().add(const Duration(hours: 24)))) {
       return '$hh:$mm';
     }
     return '${expiry.month.toString().padLeft(2, '0')}-'

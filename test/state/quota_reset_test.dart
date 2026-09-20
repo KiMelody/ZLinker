@@ -471,7 +471,13 @@ void main() {
     final body = useCall.$3.single as Map;
     expect(body['preferredProviderId'], 'prov-1');
     expect(body['resetType'], 'FIVE_HOUR');
-    expect(body['idempotencyKey'], isNotEmpty);
+    // UUID v4 like the official client — the cloud rejects other shapes
+    // (3001), and the client-side check is merely non-empty ≤64.
+    expect(
+      body['idempotencyKey'],
+      matches(RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+    );
 
     // Status confirmed with a force re-fetch after the reset.
     expect(env.statusCalls.length, 2);
