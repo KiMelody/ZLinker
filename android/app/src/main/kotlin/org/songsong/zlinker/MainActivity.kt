@@ -57,56 +57,17 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
-        handleResetIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Keep the latest deep-link intent so app_links / home_widget see it.
         setIntent(intent)
-        handleResetIntent(intent)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         engine = null
         super.cleanUpFlutterEngine(flutterEngine)
-    }
-
-    /**
-     * The quota notice's reset button arrives here (activity PendingIntent,
-     * user-initiated). Warm path pushes straight to Dart; when the engine
-     * is gone (backgrounded process, cold start) the pending flag holds
-     * the tap until Dart's wiring pulls it.
-     */
-    private fun handleResetIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_QUOTA_RESET, false) != true) return
-        pendingReset = true
-        pushReset()
-    }
-
-    private fun pushReset() {
-        val current = engine ?: return
-        MethodChannel(
-            current.dartExecutor.binaryMessenger,
-            QUOTA_WATCH_CHANNEL
-        ).invokeMethod(
-            "resetPressed",
-            null,
-            object : MethodChannel.Result {
-                override fun success(result: Any?) {
-                    if (result == true) pendingReset = false
-                }
-
-                override fun error(
-                    errorCode: String,
-                    errorMessage: String?,
-                    errorDetails: Any?
-                ) {
-                }
-
-                override fun notImplemented() {}
-            }
-        )
     }
 
     private fun parsePayload(raw: String?): JSONObject? {
@@ -118,15 +79,58 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // Internal, not private: QuotaWatchNotifier reads EXTRA_QUOTA_RESET to
-    // build the reset PendingIntent.
+    // Internal, not private: QuotaWatchActionReceiver pokes pushRefresh /
+    // pushResetFromNotice.
     internal companion object {
         const val KEEP_ALIVE_CHANNEL = "zlinker/keepalive"
         const val QUOTA_WATCH_CHANNEL = "zlinker/quota_watch"
-        const val EXTRA_QUOTA_RESET = "zlinker.extra.QUOTA_RESET"
 
         /** One process, one engine/activity — plain statics are the state. */
         var engine: FlutterEngine? = null
         var pendingReset = false
+
+        /**
+         * The quota notice's refresh broadcast: push `refreshPressed` to a
+         * live engine; with no engine this is a no-op (the next app open
+         * re-polls through the resumed lifecycle), so nothing is held.
+         */
+        fun pushRefresh() {
+            val current = engine ?: return
+            MethodChannel(
+                current.dartExecutor.binaryMessenger,
+                QUOTA_WATCH_CHANNEL
+            ).invokeMethod("refreshPressed", null)
+        }
+
+        /**
+         * The quota notice's reset broadcast: "resetPressed" replies true
+         * once Dart handled the tap, which clears the pending flag; a dead
+         * engine leaves it set for the next boot's takePendingReset pull.
+         */
+        fun pushResetFromNotice() {
+            pendingReset = true
+            val current = engine ?: return
+            MethodChannel(
+                current.dartExecutor.binaryMessenger,
+                QUOTA_WATCH_CHANNEL
+            ).invokeMethod(
+                "resetPressed",
+                null,
+                object : MethodChannel.Result {
+                    override fun success(result: Any?) {
+                        if (result == true) pendingReset = false
+                    }
+
+                    override fun error(
+                        errorCode: String,
+                        errorMessage: String?,
+                        errorDetails: Any?
+                    ) {
+                    }
+
+                    override fun notImplemented() {}
+                }
+            )
+        }
     }
 }

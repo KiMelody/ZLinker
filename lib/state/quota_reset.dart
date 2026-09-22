@@ -216,7 +216,14 @@ class QuotaResetController extends ChangeNotifier {
   final QuotaResetGateway gateway;
   final Duration staleness;
 
+  /// Bound on one status fetch — same 2026-09-21 diagnosis as the
+  /// entitlement poller's timeout: a relay-bridge rebuild can lose the
+  /// response and pin [_inFlight] forever. Must stay under the quota-watch
+  /// controller's rpcTimeout.
+  final Duration timeout;
+
   static const defaultStaleness = Duration(seconds: 10);
+  static const defaultTimeout = Duration(seconds: 10);
 
   QuotaResetPools? _pools;
   DateTime? _fetchedAt;
@@ -228,6 +235,7 @@ class QuotaResetController extends ChangeNotifier {
   QuotaResetController({
     required this.gateway,
     this.staleness = defaultStaleness,
+    this.timeout = defaultTimeout,
   });
 
   /// Latest pools with the optimistic processing flags merged in; null
@@ -270,7 +278,7 @@ class QuotaResetController extends ChangeNotifier {
 
   Future<void> _fetchNow() async {
     try {
-      final res = await gateway.quotaResetStatus();
+      final res = await gateway.quotaResetStatus().timeout(timeout);
       _pools = parseQuotaResetPools(res is Map ? res : null);
       _fetchedAt = clock.now();
       _error = null;

@@ -13,6 +13,14 @@ import 'quota_reset.dart';
 /// jittering value around the threshold never re-fire (宁漏勿延).
 const quotaWatchAlertHysteresis = 5.0;
 
+/// Stale tolerance (2026-09-20 真机诊断): a failed fetch keeps the last
+/// success in the error view ([EntitlementPoller._fetchNow]), so the judge
+/// keeps trusting it for this long instead of flipping the notice to
+/// N6「无法获取」. Fixed — doze stalls start at ~2 min but the quota
+/// windows move on hour scales, so 15 min of held data stays honest, and
+/// a settings field for it would only invite thrash.
+const quotaWatchStaleWindow = Duration(minutes: 15);
+
 /// A device link the quota watch can poll — the seam [DeviceSession]
 /// already satisfies (live status + the session-wide entitlement poller and
 /// reset controller, so polling shares the pages' cache and in-flight
@@ -82,8 +90,15 @@ class QuotaWatchSnapshot {
   /// nothing ever arrived.
   final DateTime? updatedAt;
 
-  /// Poll cadence (N6's retry copy).
+  /// Poll cadence (N6's retry copy — the value the timer actually runs
+  /// at, so failure backoff / background slowdown show through).
   final Duration retryEvery;
+
+  /// Whether the values above come from the stale tolerance (2026-09-20
+  /// 真机诊断): a failed poll judged on its retained data — the subline
+  /// stamps the fetch time so the frozen numbers read as old. Only ever
+  /// true on the data-bearing phases; false elsewhere.
+  final bool stale;
 
   const QuotaWatchSnapshot({
     required this.phase,
@@ -103,6 +118,7 @@ class QuotaWatchSnapshot {
     this.weekCoupons = 0,
     this.updatedAt,
     this.retryEvery = const Duration(minutes: 5),
+    this.stale = false,
   });
 }
 
@@ -209,8 +225,33 @@ QuotaWatchJudgement judgeQuotaWatch({
   Duration retryEvery = const Duration(minutes: 5),
 }) {
   final now = clock.now();
+  var stale = false;
 
-  // N6 / N7: no data, failed poll, or no chat bottleneck to watch.
+  // Stale tolerance (2026-09-20 真机诊断): a failed fetch keeps the last
+  // success payload in the error view, so while it is young enough keep
+  // judging it instead of blanking the notice to N6. The error view only
+  // swapped the phase — re-derive it from the payload and mark the result
+  // stale. Edge events ride the same data: unchanged values re-fire no
+  // edge, so stale needs no suppression of its own.
+  if (view != null &&
+      view.phase == EntitlementPhase.error &&
+      view.data != null &&
+      view.fetchedAt != null &&
+      now.difference(view.fetchedAt!) <= quotaWatchStaleWindow) {
+    view = EntitlementView(
+      phase: EntitlementPoller.phaseOf(view.data!),
+      data: view.data,
+      fetchedAt: view.fetchedAt,
+    );
+    stale = true;
+  }
+
+  // N6 / N7: no data, still loading, or a failed poll with nothing (or
+  // nothing inside the stale window) retained. An error view that reaches
+  // here is by definition outside the stale window (the swap above
+  // replaced the young ones) — it must stay N6, not fall through to the
+  // noPlan check below, which would misread the retained payload as a
+  // plan-less plan.
   if (view == null ||
       view.phase == EntitlementPhase.loading ||
       view.phase == EntitlementPhase.error) {
@@ -363,6 +404,7 @@ QuotaWatchJudgement judgeQuotaWatch({
       hasWeekWindow: hasWeekWindow,
       pools: pools,
       retryEvery: retryEvery,
+      stale: stale,
     ),
     events: events,
     edges: QuotaWatchEdgeState(
@@ -439,6 +481,7 @@ QuotaWatchSnapshot _snapshot({
   required bool hasWeekWindow,
   required QuotaResetPools? pools,
   required Duration retryEvery,
+  required bool stale,
 }) {
   final resetMs = bottleneck.nextResetTime;
   final detailMs = detailRow?.nextResetTime;
@@ -472,6 +515,7 @@ QuotaWatchSnapshot _snapshot({
     weekCoupons: pools?.week.count ?? 0,
     updatedAt: view.fetchedAt,
     retryEvery: retryEvery,
+    stale: stale,
   );
 }
 
@@ -495,11 +539,39 @@ class QuotaWatchController extends ChangeNotifier {
   QuotaWatchController({
     required Iterable<QuotaWatchSource> Function() sessionsOf,
     required void Function(QuotaWatchEvent event) onEvent,
+    this.rpcTimeout = const Duration(seconds: 12),
   })  : _sessionsOf = sessionsOf,
         _onEvent = onEvent;
 
   final Iterable<QuotaWatchSource> Function() _sessionsOf;
   final void Function(QuotaWatchEvent event) _onEvent;
+
+  /// Per-RPC bound for one poll tick (2026-09-20 真机诊断): under doze the
+  /// desktop judges a stalled RPC failed at ~10s, so waiting longer only
+  /// delays the tick — a timeout abandons it while the poller's in-flight
+  /// keeps running for the next tick to join. Constructor-injected so
+  /// tests shrink it (real timers, spec §8 — no fake async).
+  final Duration rpcTimeout;
+
+  /// Fixed slow cadence shared by failure backoff and the backgrounded
+  /// app (2026-09-20 真机诊断): doze throttles the CPU enough that RPCs
+  /// stall for tens of seconds, so both states settle on 5 min and are
+  /// restored independently (a resume / one success) without interacting.
+  static const backoffInterval = Duration(minutes: 5);
+
+  /// Failed ticks in a row before the backoff cadence kicks in.
+  static const backoffAfterFailures = 2;
+
+  /// Foreground re-fetch gate (2026-09-21 风控对标): the official client's
+  /// access path (page made visible again) re-fetches only past a 60s window
+  /// since the last successful pull (`HHe`/`BHe` in its useUsageEntitlement)
+  /// — rapid app switching must not hammer the billing endpoint. A failed
+  /// poll records nothing, so a resume right after a failure still retries.
+  /// Manual refreshes stay exempt (the official manual path bypasses every
+  /// gate too).
+  static const foregroundRefetchWindow = Duration(seconds: 60);
+
+  DateTime? _lastSuccessfulPollAt;
 
   bool _enabled = false;
   int _thresholdPercent = 20;
@@ -514,6 +586,8 @@ class QuotaWatchController extends ChangeNotifier {
   bool _calibrated = false;
   QuotaWatchEdgeState _edges = const QuotaWatchEdgeState();
   bool _disposed = false;
+  bool _backgrounded = false;
+  int _consecutiveFailures = 0;
 
   QuotaWatchSnapshot _snapshot =
       const QuotaWatchSnapshot(phase: QuotaWatchPhase.disabled);
@@ -521,6 +595,15 @@ class QuotaWatchController extends ChangeNotifier {
   /// The latest judged projection (the presenter renders the persistent
   /// notice from this).
   QuotaWatchSnapshot get snapshot => _snapshot;
+
+  /// The cadence the periodic timer currently runs at: the configured
+  /// interval, unless the app is backgrounded or the poll is in failure
+  /// backoff — both slow to the fixed [backoffInterval]. Also the honest
+  /// value for the N6 retry copy.
+  Duration get effectiveInterval =>
+      (_backgrounded || _consecutiveFailures >= backoffAfterFailures)
+          ? backoffInterval
+          : _interval;
 
   /// The monitored device (first online session); null while nothing is
   /// online — the deep links (notice body tap / failed-reset retry) open
@@ -555,6 +638,9 @@ class QuotaWatchController extends ChangeNotifier {
     _fiveHourExpiryLeadMinutes = fiveHourExpiryLeadMinutes;
     _weeklyExpiryLeadHours = weeklyExpiryLeadHours;
     _enabled = enabled;
+    // A fresh enable starts from a clean slate: failures accumulated
+    // before the switch-off must not open in backoff.
+    if (!wasEnabled && enabled) _consecutiveFailures = 0;
     _syncTimer();
     if (!enabled) {
       _emit(QuotaWatchSnapshot(
@@ -575,13 +661,49 @@ class QuotaWatchController extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     if (_enabled) {
-      _timer = Timer.periodic(_interval, (_) => unawaited(pollNow()));
+      _timer = Timer.periodic(effectiveInterval, (_) => unawaited(pollNow()));
     }
+  }
+
+  // ------------------------------------------------- app lifecycle seam
+  //
+  // main.dart's WidgetsBindingObserver calls these (lifecycle is a
+  // widget-layer concept and stays out of the state layer).
+
+  /// App resumed: restore the configured cadence and re-poll at once — the
+  /// 2026-09-20 真机诊断 showed doze-stalled ticks leaving old data standing
+  /// until the next periodic tick, and a resume must refresh at once. Not
+  /// gated by the backoff: it drives [pollNow] directly, off the timer.
+  /// Skipped while the last successful poll is younger than
+  /// [foregroundRefetchWindow].
+  void foregrounded() {
+    if (_disposed) return;
+    _backgrounded = false;
+    _consecutiveFailures = 0;
+    _syncTimer();
+    final last = _lastSuccessfulPollAt;
+    if (last != null &&
+        clock.now().difference(last) < foregroundRefetchWindow) {
+      return;
+    }
+    unawaited(pollNow(force: true));
+  }
+
+  /// App paused (home screen, app switch, screen off): drop to the fixed
+  /// slow cadence — doze throttles the CPU enough that the tight cadence
+  /// only burns battery while every RPC stalls anyway.
+  void backgrounded() {
+    if (_disposed) return;
+    _backgrounded = true;
+    _syncTimer();
   }
 
   /// One poll + judge cycle (public so tests and manual refreshes drive
   /// it). Never throws — the poller surfaces failures as an error phase.
-  Future<void> pollNow() async {
+  /// [force] bypasses the poller's staleness cache for user-visible
+  /// triggers (manual tap, app foreground); periodic ticks force only
+  /// when the cadence is tighter than the cache window.
+  Future<void> pollNow({bool force = false}) async {
     if (_disposed || !_enabled) return;
     final session = _pickSession();
     if (session == null) {
@@ -590,20 +712,42 @@ class QuotaWatchController extends ChangeNotifier {
       _emit(QuotaWatchSnapshot(
         phase: QuotaWatchPhase.unavailable,
         updatedAt: null,
-        retryEvery: _interval,
+        retryEvery: effectiveInterval,
       ));
       return;
     }
     _current = session;
     // Decision #3: reuse the poller's cache/in-flight, but force when the
-    // watch cadence is tighter than the poller's staleness.
-    final force = _interval < EntitlementPoller.defaultStaleness;
+    // watch cadence is tighter than the poller's staleness (or the caller
+    // is a user-visible trigger — a manual refresh must never read the
+    // cache, or the button "does nothing" for up to 5 minutes).
+    final effectiveForce =
+        force || _interval < EntitlementPoller.defaultStaleness;
+    var failed = false;
     try {
-      _lastView = await session.entitlementSnapshot(force: force);
-      await session.quotaResetController.refresh(force: force);
+      _lastView = await session.entitlementSnapshot(force: effectiveForce)
+          .timeout(rpcTimeout);
+      await session.quotaResetController.refresh(force: effectiveForce)
+          .timeout(rpcTimeout);
     } catch (_) {
-      // entitlementSnapshot reports failures via its phase; the pools
-      // refresh never throws. Re-judge below on whatever data stands.
+      // A failed/stalled RPC abandons the tick (the poller's in-flight
+      // keeps running; the next tick joins it) and re-judges on whatever
+      // data stands — entitlementSnapshot also reports failures via its
+      // error phase below.
+      failed = true;
+    }
+    if (_lastView?.phase == EntitlementPhase.error) failed = true;
+    if (!failed) _lastSuccessfulPollAt = clock.now();
+    // Failure backoff (2026-09-20 真机诊断): [backoffAfterFailures] failed
+    // ticks in a row slow the timer to the fixed backoff cadence; the
+    // first success restores the configured one. The timer only re-syncs
+    // on the flip — resetting it every tick would postpone periodic polls
+    // behind the manual ones.
+    final wasBackingOff =
+        _consecutiveFailures >= backoffAfterFailures;
+    _consecutiveFailures = failed ? _consecutiveFailures + 1 : 0;
+    if (wasBackingOff != (_consecutiveFailures >= backoffAfterFailures)) {
+      _syncTimer();
     }
     _apply();
   }
@@ -619,7 +763,7 @@ class QuotaWatchController extends ChangeNotifier {
       expiryReminderEnabled: _expiryReminderEnabled,
       fiveHourExpiryLeadMinutes: _fiveHourExpiryLeadMinutes,
       weeklyExpiryLeadHours: _weeklyExpiryLeadHours,
-      retryEvery: _interval,
+      retryEvery: effectiveInterval,
     );
     _edges = judgement.edges;
     // The first bottleneck-bearing judgement is the cold-start baseline:

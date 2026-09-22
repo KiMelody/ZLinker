@@ -80,19 +80,35 @@ object QuotaWatchNotifier {
         )
 
     /**
-     * The inline reset button launches MainActivity with the reset extra
-     * (a user-initiated activity PendingIntent, allowed from the
-     * background unlike a broadcast trampoline). MainActivity forwards it
-     * to Dart, which runs the direct reset while the process stays alive.
+     * The inline reset button taps a broadcast (same shape as the refresh
+     * icon): QuotaWatchActionReceiver holds the pending flag for a dead
+     * engine (the next app open pulls it via takePendingReset) and pushes
+     * `resetPressed` to a live one, which runs the direct reset while the
+     * process stays in place.
      */
     private fun resetIntent(context: Context): PendingIntent =
-        PendingIntent.getActivity(
+        PendingIntent.getBroadcast(
             context,
             2001,
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra(MainActivity.EXTRA_QUOTA_RESET, true)
+            Intent(context, QuotaWatchActionReceiver::class.java).apply {
+                action = QuotaWatchActionReceiver.ACTION_RESET
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+    /**
+     * The manual-refresh icon taps a broadcast, not an activity: the shade
+     * stays open and the app is not opened. QuotaWatchActionReceiver
+     * pushes `refreshPressed` to a live engine; a dead engine is served by
+     * the next app open (resumed lifecycle re-polls), so unlike the reset
+     * no pending flag needs to hold the tap.
+     */
+    private fun refreshIntent(context: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            2003,
+            Intent(context, QuotaWatchActionReceiver::class.java).apply {
+                action = QuotaWatchActionReceiver.ACTION_REFRESH
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -196,6 +212,9 @@ object QuotaWatchNotifier {
             )
             v.setOnClickPendingIntent(R.id.quota_action, resetIntent(context))
         }
+
+        // Always visible (any phase can go stale) → unconditional bind.
+        v.setOnClickPendingIntent(R.id.quota_refresh, refreshIntent(context))
 
         val lines: JSONArray? = data.optJSONArray("expanded")
         if (expanded && lines != null && lines.length() > 0) {

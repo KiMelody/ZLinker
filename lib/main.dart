@@ -36,7 +36,8 @@ class ZLinkerApp extends StatefulWidget {
   State<ZLinkerApp> createState() => _ZLinkerAppState();
 }
 
-class _ZLinkerAppState extends State<ZLinkerApp> {
+class _ZLinkerAppState extends State<ZLinkerApp>
+    with WidgetsBindingObserver {
   final DeviceStore _store = DeviceStore();
   final ThemeController _theme = ThemeController();
   final UiSettings _ui = UiSettings();
@@ -72,6 +73,7 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
       }
     },
     onOpenUsage: _openQuotaUsagePage,
+        onRefresh: () => _quotaWatch.pollNow(force: true),
   );
   late final QuotaWatchController _quotaWatch = QuotaWatchController(
     sessionsOf: () => _hub.activeSessions,
@@ -85,6 +87,7 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _theme.load();
     final uiLoaded = _ui.load();
     _scheduled.load();
@@ -111,6 +114,13 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     _quotaWatchChannel.setMethodCallHandler((call) async {
       if (call.method == 'resetPressed') {
         unawaited(_quotaPresenter.handleResetPress());
+        return true;
+      }
+      // The notice's refresh icon (native push; a dead engine is served by
+      // the next app open, whose resumed lifecycle re-polls instead).
+      if (call.method == 'refreshPressed') {
+        debugPrint('[quota-watch] manual refresh pressed');
+        unawaited(_quotaPresenter.handleRefreshPress());
         return true;
       }
       return null;
@@ -285,8 +295,23 @@ class _ZLinkerAppState extends State<ZLinkerApp> {
     _hub.scheduleResume(device);
   }
 
+  /// Quota watch cadence (2026-09-20 真机诊断): doze stalls the RPCs, so
+  /// going to the background (paused — home screen, app switch, screen
+  /// off) drops to the slow 5-minute cadence, and a resume refreshes at
+  /// once instead of waiting out the next periodic tick. `inactive` /
+  /// `hidden` (dialogs, system sheets) leave the cadence alone.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _quotaWatch.foregrounded();
+    } else if (state == AppLifecycleState.paused) {
+      _quotaWatch.backgrounded();
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _widgetClickSub?.cancel();
     _appLinkSub?.cancel();
     _notifyHub.dispose();

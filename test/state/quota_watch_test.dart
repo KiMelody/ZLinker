@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:clock/clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -164,11 +166,22 @@ void main() {
   group('judgeQuotaWatch phases', () {
     quotaTest('N7: no plan / no chat bottleneck → noPlan (hidden)', () {
       expect(_judge(null, null).snapshot.phase, QuotaWatchPhase.unavailable);
+      // An error with no payload retained (or nothing inside the stale
+      // window) still blanks to unavailable.
+      expect(
+          _judge(
+            EntitlementView(phase: EntitlementPhase.error, fetchedAt: null),
+            null,
+          ).snapshot.phase,
+          QuotaWatchPhase.unavailable);
+      // An error holding an empty-plan payload inside the stale window
+      // re-derives that payload's phase (noPlan) instead of unavailable —
+      // the retained data is the truth (2026-09-20 stale tolerance).
       expect(
           _judge(_view(const [], phase: EntitlementPhase.error), null)
               .snapshot
               .phase,
-          QuotaWatchPhase.unavailable);
+          QuotaWatchPhase.noPlan);
       expect(
           _judge(_view(const [], phase: EntitlementPhase.loginRequired), null)
               .snapshot
@@ -235,20 +248,42 @@ void main() {
       expect(alert.hasAnyPool, isFalse);
     });
 
-    quotaTest('N6 unavailable stamps the last success time and the cadence',
-        () {
+    quotaTest(
+        'N6 vs stale: an error young enough keeps judging the retained '
+        'data (stale=true); past the window it blanks to unavailable', () {
       final failing = EntitlementView(
         phase: EntitlementPhase.error,
         data: _dualPlan().data,
         fetchedAt: _currentNow,
         error: 'boom',
       );
-      final snapshot = _judge(failing, null,
+      final fresh = _judge(failing, null,
               retryEvery: const Duration(minutes: 1))
           .snapshot;
-      expect(snapshot.phase, QuotaWatchPhase.unavailable);
-      expect(snapshot.updatedAt, _currentNow);
-      expect(snapshot.retryEvery, const Duration(minutes: 1));
+      // 2026-09-20 stale tolerance: the notice keeps the last success'
+      // numbers, marked stale, instead of flipping to N6.
+      expect(fresh.phase, QuotaWatchPhase.normal);
+      expect(fresh.stale, isTrue);
+      expect(fresh.updatedAt, _currentNow);
+      expect(fresh.retryEvery, const Duration(minutes: 1));
+
+      // One minute past the 15-minute window: no more borrowed data —
+      // N6 stamps the last success time and carries the retry cadence.
+      final fetchedAt = _currentNow;
+      advanceClock(quotaWatchStaleWindow);
+      // Exactly on the window edge: the endpoint is inclusive.
+      final onEdge = _judge(failing, null).snapshot;
+      expect(onEdge.phase, QuotaWatchPhase.normal);
+      expect(onEdge.stale, isTrue);
+
+      advanceClock(const Duration(minutes: 1));
+      final aged = _judge(failing, null,
+              retryEvery: const Duration(minutes: 1))
+          .snapshot;
+      expect(aged.phase, QuotaWatchPhase.unavailable);
+      expect(aged.stale, isFalse);
+      expect(aged.updatedAt, fetchedAt);
+      expect(aged.retryEvery, const Duration(minutes: 1));
     });
   });
 
@@ -638,6 +673,163 @@ void main() {
       expect(source.snapshotForces, isEmpty);
     });
 
+    quotaTest(
+        'failure backoff: two failed ticks slow to 5 min, one success '
+        'restores the configured cadence (2026-09-20 真机诊断)', () async {
+      final source = sourceOf(view: _dualPlan());
+      final controller = QuotaWatchController(
+        sessionsOf: () => [source],
+        onEvent: (_) {},
+      );
+      addTearDown(controller.dispose);
+      controller.configure(
+        enabled: true,
+        thresholdPercent: 20,
+        interval: const Duration(minutes: 1),
+        expiryReminderEnabled: true,
+        fiveHourExpiryLeadMinutes: 60,
+        weeklyExpiryLeadHours: 6,
+      );
+      await until(() => controller.snapshot.phase == QuotaWatchPhase.normal);
+      expect(controller.effectiveInterval, const Duration(minutes: 1));
+
+      // Failed ticks carry the retained ok payload: the notice keeps
+      // judging it (stale) while the cadence backs off.
+      source.setView(EntitlementView(
+        phase: EntitlementPhase.error,
+        data: _dualPlan().data,
+        fetchedAt: _currentNow,
+        error: 'boom',
+      ));
+      await controller.pollNow();
+      await controller.pollNow();
+      expect(controller.effectiveInterval,
+          QuotaWatchController.backoffInterval);
+      expect(controller.snapshot.phase, QuotaWatchPhase.normal);
+      expect(controller.snapshot.stale, isTrue);
+
+      // One success drops the backoff at once.
+      source.setView(_dualPlan());
+      await controller.pollNow();
+      expect(controller.effectiveInterval, const Duration(minutes: 1));
+      expect(controller.snapshot.stale, isFalse);
+    });
+
+    quotaTest(
+        'lifecycle seam: backgrounded drops to the slow cadence, '
+        'foregrounded re-polls at once and restores it', () async {
+      final source = sourceOf();
+      final controller = QuotaWatchController(
+        sessionsOf: () => [source],
+        onEvent: (_) {},
+      );
+      addTearDown(controller.dispose);
+      controller.configure(
+        enabled: true,
+        thresholdPercent: 20,
+        interval: const Duration(minutes: 1),
+        expiryReminderEnabled: true,
+        fiveHourExpiryLeadMinutes: 60,
+        weeklyExpiryLeadHours: 6,
+      );
+      await until(() => controller.snapshot.phase == QuotaWatchPhase.normal);
+
+      controller.backgrounded();
+      expect(controller.effectiveInterval,
+          QuotaWatchController.backoffInterval);
+
+      // Past the foreground gate window, the resume polls immediately —
+      // not gated by the slow timer.
+      advanceClock(QuotaWatchController.foregroundRefetchWindow +
+          const Duration(seconds: 1));
+      final fetches = source.snapshotForces.length;
+      controller.foregrounded();
+      await until(() => source.snapshotForces.length > fetches);
+      expect(controller.effectiveInterval, const Duration(minutes: 1));
+    });
+
+    quotaTest(
+        'foreground gate: a resume inside 60s of the last SUCCESSFUL poll '
+        'skips the re-fetch (official access path parity), a resume after '
+        'a failed poll still retries', () async {
+      final source = sourceOf();
+      final controller = QuotaWatchController(
+        sessionsOf: () => [source],
+        onEvent: (_) {},
+      );
+      addTearDown(controller.dispose);
+      controller.configure(
+        enabled: true,
+        thresholdPercent: 20,
+        interval: const Duration(minutes: 15),
+        expiryReminderEnabled: true,
+        fiveHourExpiryLeadMinutes: 60,
+        weeklyExpiryLeadHours: 6,
+      );
+      await until(() => controller.snapshot.phase == QuotaWatchPhase.normal);
+
+      // Inside the window: no fetch, but the cadence still restores.
+      controller.backgrounded();
+      final fetches = source.snapshotForces.length;
+      controller.foregrounded();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(source.snapshotForces.length, fetches);
+      expect(controller.effectiveInterval, const Duration(minutes: 15));
+
+      // A FAILED poll records nothing: the failure happens past the last
+      // success's window, and a resume right after it still retries (were
+      // the failure to stamp the gate, this resume would be swallowed).
+      advanceClock(QuotaWatchController.foregroundRefetchWindow +
+          const Duration(seconds: 1));
+      source.setView(EntitlementView(
+        phase: EntitlementPhase.error,
+        data: _dualPlan().data,
+        fetchedAt: _currentNow,
+        error: 'boom',
+      ));
+      await controller.pollNow();
+      expect(controller.snapshot.stale, isTrue);
+      final afterFailure = source.snapshotForces.length;
+      controller.backgrounded();
+      controller.foregrounded();
+      await until(() => source.snapshotForces.length > afterFailure);
+      expect(source.snapshotForces.last, isTrue);
+    });
+
+    quotaTest(
+        'a stalled RPC abandons the tick at the injected timeout '
+        '(doze stalls run tens of seconds)', () async {
+      final source = sourceOf();
+      final controller = QuotaWatchController(
+        sessionsOf: () => [source],
+        onEvent: (_) {},
+        rpcTimeout: const Duration(milliseconds: 50),
+      );
+      addTearDown(controller.dispose);
+      controller.configure(
+        enabled: true,
+        thresholdPercent: 20,
+        interval: const Duration(minutes: 1),
+        expiryReminderEnabled: true,
+        fiveHourExpiryLeadMinutes: 60,
+        weeklyExpiryLeadHours: 6,
+      );
+      await until(() => controller.snapshot.phase == QuotaWatchPhase.normal);
+
+      source.stallNext = Completer<EntitlementView>();
+      final sw = Stopwatch()..start();
+      await controller.pollNow();
+      sw.stop();
+      // The tick is bounded by the timeout, not the stall — and counts as
+      // a failure (a second one would back the cadence off).
+      expect(sw.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(controller.effectiveInterval, const Duration(minutes: 1));
+      source.stallNext = Completer<EntitlementView>();
+      await controller.pollNow();
+      expect(controller.effectiveInterval,
+          QuotaWatchController.backoffInterval);
+    });
+
     quotaTest('changing an expiry lead re-judges the last view without an RPC',
         () async {
       final source = sourceOf(
@@ -816,6 +1008,10 @@ class FakeSource implements QuotaWatchSource, QuotaResetGateway {
   /// and the view when a reset goes through.
   void Function(String resetType)? onUse;
 
+  /// When set, the next [entitlementSnapshot] never completes — simulates
+  /// a doze-stalled RPC for the controller's timeout bound.
+  Completer<EntitlementView>? stallNext;
+
   final snapshotForces = <bool>[];
   final poolForces = <bool>[];
   final usedTypes = <String>[];
@@ -828,6 +1024,11 @@ class FakeSource implements QuotaWatchSource, QuotaResetGateway {
   @override
   Future<EntitlementView> entitlementSnapshot({bool force = false}) async {
     snapshotForces.add(force);
+    final stall = stallNext;
+    if (stall != null) {
+      stallNext = null;
+      return stall.future;
+    }
     return _view;
   }
 

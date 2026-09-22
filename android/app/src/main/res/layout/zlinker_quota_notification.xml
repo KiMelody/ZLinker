@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Persistent quota-watch notice (QuotaWatchNotifier): collapsed row is
-     ring + text + same-row action; the detail box renders only in the
-     bigContentView (expanded) variant. All copy/colors are set from Dart
-     payloads in QuotaWatchNotifier.views(). -->
+     ring + text + same-row action + always-visible refresh icon; the
+     detail box renders only in the bigContentView (expanded) variant. All
+     copy/colors are set from Dart payloads in QuotaWatchNotifier.views(). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -83,6 +83,16 @@
             android:textStyle="bold"
             android:background="@drawable/zlinker_quota_pill"
             android:visibility="gone" />
+
+        <!-- Manual re-poll, visible in every phase (any state can go
+             stale). Click is bound once in QuotaWatchNotifier.views(). -->
+        <ImageView
+            android:id="@+id/quota_refresh"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
+            android:padding="10dp"
+            android:src="@drawable/zlinker_quota_refresh" />
     </LinearLayout>
 
     <LinearLayout

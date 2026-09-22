@@ -1109,6 +1109,7 @@ const _zh = {
   'op.watch.reset.failBody': '连接中断或桌面拒绝 · 点按进 app 查看并重试',
   'op.watch.fail.title': '额度获取失败 · \$0 更新',
   'op.watch.fail.body': '桌面离线或连接中断 · 每 \$0 自动重试',
+  'op.watch.stale.line': '数据更新于 \$0',
 
   // ---- Automations functional alignment (official desktop dictionary) ----
   'auto.preset': '调度方式',
@@ -2055,6 +2056,7 @@ const _en = {
   'op.watch.reset.failBody': 'Connection lost or desktop refused · tap to retry in app',
   'op.watch.fail.title': 'Couldn\'t refresh quota · updated \$0',
   'op.watch.fail.body': 'Desktop offline or disconnected · retrying every \$0',
+  'op.watch.stale.line': 'Data as of \$0',
 
   // ---- Automations functional alignment (official desktop dictionary) ----
   'auto.preset': 'Frequency',

@@ -30,10 +30,12 @@ class QuotaWatchPresenter {
     required String Function() localeOf,
     required Future<void> Function(QuotaWindowKind? kind) onReset,
     required Future<void> Function() onOpenUsage,
+    required Future<void> Function() onRefresh,
   })  : _service = service,
         _localeOf = localeOf,
         _onReset = onReset,
-        _onOpenUsage = onOpenUsage;
+        _onOpenUsage = onOpenUsage,
+        _onRefresh = onRefresh;
 
   static const _channel = MethodChannel('zlinker/quota_watch');
 
@@ -45,6 +47,7 @@ class QuotaWatchPresenter {
   final String Function() _localeOf;
   final Future<void> Function(QuotaWindowKind? kind) _onReset;
   final Future<void> Function() _onOpenUsage;
+  final Future<void> Function() _onRefresh;
 
   QuotaWindowKind? _pendingResetKind;
   bool _pendingDegrade = false;
@@ -105,6 +108,11 @@ class QuotaWatchPresenter {
   /// The notice body was tapped → deep-link into the app's usage page.
   Future<void> handleOpenUsage() => _onOpenUsage();
 
+  /// The notice's refresh icon was tapped (native `refreshPressed` push;
+  /// a dead-engine tap just opens the app, whose resumed lifecycle re-polls
+  /// through the same entry) → an immediate re-poll.
+  Future<void> handleRefreshPress() => _onRefresh();
+
   // ------------------------------------------------------------- notices
 
   Future<void> _updateNotice(QuotaWatchSnapshot s) async {
@@ -146,6 +154,13 @@ class QuotaWatchPresenter {
           _couponLabel(s.expiringKind!),
           _duration(s.expiringAt!.difference(now)),
         ]);
+      }
+      if (s.stale) {
+        // Stale tolerance (2026-09-20 真机诊断): the numbers come from the
+        // retained pre-failure data — stamp the fetch time so they read as
+        // old (standalone line when the phase has no subline of its own).
+        final stamp = _trP('op.watch.stale.line', [_clock(s.updatedAt ?? now)]);
+        sub = sub == null ? stamp : '$sub · $stamp';
       }
       if (s.buttonKind != null) {
         button = _tr(s.phase == QuotaWatchPhase.lowQuota

@@ -280,13 +280,24 @@ class EntitlementPoller extends ValueNotifier<EntitlementView> {
   final Future<dynamic> Function() fetch;
   final Duration staleness;
 
+  /// Bound on one fetch (2026-09-21 真机诊断): the relay bridge can rebuild
+  /// mid-RPC and never answer, and a lost response would otherwise pin
+  /// [_inFlight] forever — every later refresh (force included) shares the
+  /// dead future and the watch freezes on old data. The timeout resolves
+  /// the fetch into the error phase, whose catch/finally release the slot.
+  /// Kept under the quota-watch controller's rpcTimeout so the poller, not
+  /// the caller's abandon, always settles first.
+  final Duration timeout;
+
   static const defaultStaleness = Duration(minutes: 5);
+  static const defaultTimeout = Duration(seconds: 10);
 
   Future<EntitlementView>? _inFlight;
 
   EntitlementPoller({
     required this.fetch,
     this.staleness = defaultStaleness,
+    this.timeout = defaultTimeout,
   }) : super(const EntitlementView(phase: EntitlementPhase.loading));
 
   /// Whether the current snapshot may stand in for a refresh: fetched
@@ -314,7 +325,7 @@ class EntitlementPoller extends ValueNotifier<EntitlementView> {
       value = const EntitlementView(phase: EntitlementPhase.loading);
     }
     try {
-      final res = await fetch();
+      final res = await fetch().timeout(timeout);
       if (res is! Map) {
         throw StateError('entitlement: unexpected payload');
       }
@@ -324,7 +335,25 @@ class EntitlementPoller extends ValueNotifier<EntitlementView> {
         data: data,
         fetchedAt: clock.now(),
       );
+      // TEMP DIAGNOSIS (2026-09-20 刷新延迟): quantifies the pipeline —
+      // generatedAt age (composition lag) + a limits digest (data drift).
+      // Debug builds only: one line per fetch is too chatty for release.
+      assert(() {
+        final gen = data['generatedAt'];
+        final quota = data['quota'];
+        final limits = quota is Map && quota['limits'] is List
+            ? (quota['limits'] as List)
+                .whereType<Map>()
+                .map((l) => '${l['type']}:${l['percentage']}%')
+                .join(' ')
+            : '-';
+        debugPrint('[quota] fetched: age='
+            '${gen is num ? clock.now().millisecondsSinceEpoch - gen : '?'}ms'
+            ' limits=$limits');
+        return true;
+      }());
     } catch (e) {
+      debugPrint('[quota] entitlement fetch failed: $e');
       // Keep the previous payload visible; only phase and error change.
       value = EntitlementView(
         phase: EntitlementPhase.error,
