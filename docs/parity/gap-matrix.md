@@ -112,7 +112,7 @@
 | C21 权限交互核心 | resolveInteraction optionId/freeText/action | 已有(allowOnce/allowAlways/deny/custom 本地化) | 一致 | — | |
 | C22 Goal/compact/模型切换 | goalBanner/pause/resume、/compact、switchModelConfig/switchCollaborationMode | 已有 | 一致 | — | |
 | C23 附件上传 | begin/chunk/commit 384KB+sha256、状态机、上限文案 | 已有;失败重试/超限文案待核 | 一致/部分 | — | |
-| C24 subagent 运行进度/详情 | 状态面板「智能体」分区(运行条目+已运行时长)+ composer「Bash x 个、子智能体 y 个」计数;无子会话浏览 | composer 模式 chip 右侧子智能体 pill(仅运行中,全终态 3s 确认后销毁;仅计子代理——与官方混合计数为有意差异,bash 留 works 灰条不双显)→ 管理 sheet:运行区(spinner+已运行时长+池化实时动作 tail+详情/停止带确认)+已结束区(窗口内 subagent 终态行+rowsRange 翻更早,**native-only**);`_SubagentTile`/GoalPanel running tile/Agent 行亦可点 → 只读子会话详情页(订阅 childSessionId,assistantText/reasoning/toolCall 简化时间线+历史翻页,运行中可停止);works 灰条收敛为 bash-only 单行计数。**详情页/已结束管理为 native-only 能力补全,web 移动端无对应** | 一致+超出 | P1 | ✅(模拟器 adb 实测 2026-09-17:pill 出现/销毁·sheet 三区·详情钻入·停止确认·加载更早翻页至"已全部加载 · 共 N 个"·works 收敛·对话流加载更早两页) |
+| C24 subagent 运行进度/详情 | 状态面板「智能体」分区(运行条目+已运行时长)+ composer「Bash x 个、子智能体 y 个」计数;无子会话浏览 | composer 模式 chip 右侧子智能体 pill(仅运行中,全终态 3s 确认后销毁;仅计子代理——与官方混合计数为有意差异,bash 留 works 灰条不双显)→ 管理 sheet:运行区(spinner+已运行时长+池化实时动作 tail+详情/停止带确认)+已结束区(窗口内 subagent 终态行+rowsRange 翻更早,**native-only**);`_SubagentTile`/GoalPanel running tile/Agent 行亦可点 → 只读子会话详情页(订阅 childSessionId,assistantText/reasoning/toolCall 简化时间线+历史翻页,运行中可停止);works 灰条收敛为 bash-only 单行计数。09-23 渲染对齐:详情页滚动三件套(回底箭头=共享 JumpToBottomButton/打开定位最新/贴底流式跟随)+工具调用 diff 默认收起(ExpansionTile,与主聊天工具卡同款)。**详情页/已结束管理为 native-only 能力补全,web 移动端无对应** | 一致+超出 | P1 | ✅(模拟器 adb 实测 2026-09-17:pill 出现/销毁·sheet 三区·详情钻入·停止确认·加载更早翻页至"已全部加载 · 共 N 个"·works 收敛·对话流加载更早两页);09-23 diff 收起 ✅模拟器实证;滚动三件套 widget 测试覆盖,环境受限未实证(见文末记录) |
 
 ## U. device_usage_page(套餐用量)
 
@@ -266,3 +266,11 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - **协议事实(定证)**:①relay 任务行无 workspaceIdentity 实发(184 行全 path 键,workspace 条目 identity 亦全 null;wire schema `workspaceIdentity: optional` 但 3.14.1 未发);②live 索引行结构无任何 archived/deleted 字段(runtime @14279373 构造点),归属只能靠订阅身份;③注册表与会话库是两套数据源(桌面侧栏=listSessions 51 个,任务列表=注册表 12 个非归档+29 个 7 天自动归档)——「default 少了很多」是口径差异非丢失;④setting `taskAutoArchiveEnabled:true, taskAutoArchiveOlderThanDays:7` 桌面自动归档注册表任务。
 - 测试:task_directory_test 16→19(镜像择优×2 帧序双向断言/live 自证压过择优键/墓碑剔除/置顶墓碑/relay 行防御保留);fake_device_session 镜像生产订阅身份;全量 727 绿,analyze 0 警告。真机验收:冷重启前后全部行键一致(帧序依赖消灭)、错位清零、进 default 对话再退出保持 12 不膨胀。
 - 已知残留:唯一另一镜像失手案例(sess_5329c1b9,PaiFlow)在其工作区非活跃时显示错组——live 索引仅活跃工作区可订阅(单终端),根治需桌面清理镜像行(可上游反馈)。
+
+## subagent 详情页渲染对齐实现记录(2026-09-23,任务 09-23-subagent-render-parity,真机验收通过)
+
+- **C24 增量**:详情页滚动三件套对齐主聊天——①回底箭头(新共享组件 `lib/ui/chat/jump_to_bottom_button.dart`,主聊天 `_JumpToBottomButton` 原样提取,行为零变化);②打开定位最新(ready 后列表首帧 jumpTo maxScrollExtent);③贴底流式跟随(行数增长 && 贴底(≥max-40) && 非 `_loadingOlder` → 200ms easeOut animateTo;贴底判断在 postFrame 内,与主聊天同款;上翻不跟随靠箭头回底;`_loadOlder` prepend 期间不误触发)。
+- **R2 工具调用 diff 收起**:`_ToolSummary` 改 ExpansionTile 默认收起(对齐主聊天 `_ToolCallTile`):收起=状态图标+摘要行+/- 计数(caption 同款),展开=DiffView;无 diff 工具行保持静态摘要行(展开无内容不挂 ExpansionTile)。`SubagentTimelineRow` 主聊天内联 Agent 展开同步生效(预期)。R3 核实:assistantText 走共享 ZLinkerMarkdown,fenced 块默认收起,无缺陷(multiline 无 language 单行块走行内样式为既有设计)。
+- 测试:subagent_detail_page_test +1(初始贴底/流式跟随/上翻停跟+箭头淡入/点箭头回底+淡出)并同步收起断言;chat_page_test 内联时间线用例暴露无 diff 行 Row 嵌套 Expanded 布局崩溃,已修(标题 Expanded 平铺进各分支的 Row,不跨层嵌套)。全量 728 绿,analyze 0 问题;令牌闸门 fontSize=8/Radius=0/withOpacity=0。
+- 模拟器验收(adb 实测 2026-09-23):详情页真实数据渲染正常(全行类型:userInput/探索/思考过程/终端/已写入/总结)、**R2 默认收起+点击展开+diff 红绿行像素级验证通过**、订阅超时→重试恢复正常。R1 滚动三件套模拟器未实证:验收载体子会话内容不满一屏(无滚动余量,箭头按设计不出现)+桌面 bridge 崩循环(观测者重型会话推大快照所致)挡住运行中 subagent 的流式 delta,属环境限制非代码问题。
+- ✅ 真机验收(用户 2026-09-23,debug 构建覆盖安装):滚动三件套(打开定位/回底箭头/流式跟随)与 diff 收起全部通过。
