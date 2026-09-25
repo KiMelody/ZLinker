@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-09-26
+
+### Added
+
+- **Bridge-crash resilience** (upstream 45s pendulum): snapshot-window
+  totalCount/firstRowId with unconditional retention of loaded older rows,
+  server bridge-generation detection triggering `recovered`, session-index
+  subscription identity/tombstone fields; createSession in-flight downgrade
+  self-heal (idempotent same-commandId retry, duplicate takes sessionId);
+  quota-watch chain — lifecycle rhythm (background throttle /
+  refresh-on-resume), manual refresh action on the notification, RPC
+  timeouts preventing a stuck inFlight poll, stale-data copy.
+- **Chat history hybrid loading**: three entry points (scroll prefetch,
+  top rubber-band pull, load-earlier button) with measured-offset prepend
+  anchoring and drag-hold deferral.
+- **Subagent detail page render parity** with the main chat: scroll trio
+  (open-at-latest / stick-to-bottom streaming / shared back-to-bottom
+  arrow), tool diffs collapsed by default with +/- counts.
+- **Task list reliability**: deterministic mirror-row selection, live
+  subscription identity self-attestation, tombstone filtering; best-effort
+  30s bootstrap refresh while the task list page is visible.
+
+### Fixed
+
+- **Cold-start new-session failure**: createSession always sends a
+  `thought` level (draft → prepareWorkspace currentValue → `max`),
+  removing the bare-config early-out that failed model creation instantly
+  on cold workspaces; failed sessions surface an error card instead of
+  silence; config switches lost during a pendulum window show a reverted
+  toast.
+- Notification false positive: error→completedSuccess without a running
+  gap is now reported — real completions after transient bridge-crash
+  errors are no longer missed.
+
 ## [1.12.1] - 2026-09-20
 
 ### Added
