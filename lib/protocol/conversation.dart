@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
@@ -1939,6 +1940,7 @@ class ConversationState extends ChangeNotifier {
   }
 
   void _applySnapshot(Map<String, dynamic> snap, int toSeq) {
+    _detectConfigRevert(snap);
     snapshot = snap;
     _usageEvent = null;
     if (_pendingPatch != null) {
@@ -2078,8 +2080,55 @@ class ConversationState extends ChangeNotifier {
   /// `state.updated` frame may lag). Merges into snapshot immediately.
   void optimisticPatch(Map<String, dynamic> patch) {
     if (snapshot == null) return;
+    final config = patch['config'];
+    if (config is Map) {
+      _optimisticConfig = (
+        value: Map<String, dynamic>.from(config),
+        at: clock.now(),
+      );
+    }
     snapshot = {...snapshot!, ...patch};
     notifyListeners();
+  }
+
+  /// Optimistic-config trace (design 09-25 D3): what [optimisticPatch]
+  /// last wrote under the `config` key and when — the "switch did not
+  /// take effect" detector's baseline. Null when no optimistic config
+  /// write is pending comparison.
+  ({Map<String, dynamic> value, DateTime at})? _optimisticConfig;
+
+  /// How long an optimistic write stays worth comparing (design D3:
+  /// stale optimism is not worth mentioning).
+  static const Duration _optimisticRevertWindow = Duration(seconds: 60);
+
+  /// One-shot flag raised by [_detectConfigRevert]; the chat page consumes
+  /// it (SnackBar) via [consumeConfigReverted] — read-and-clear.
+  bool _configReverted = false;
+
+  /// Reads and clears the revert flag.
+  bool consumeConfigReverted() {
+    final reverted = _configReverted;
+    _configReverted = false;
+    return reverted;
+  }
+
+  /// Revert detection (design D3), run against each authoritative
+  /// snapshot's `config`: a value differing from a still-fresh (≤60s)
+  /// optimistic write means the switch command was lost in a bridge swing
+  /// and this snapshot silently rolled the UI back to the desktop's old
+  /// setting — raise the one-shot flag. Same value = the switch survived
+  /// (trace clears, no flag). Snapshots without `config` are not a
+  /// verdict; the `state.updated` merge path never runs this (an
+  /// incremental patch is the confirmation, not a rollback).
+  void _detectConfigRevert(Map<String, dynamic> snap) {
+    final trace = _optimisticConfig;
+    if (trace == null) return;
+    final incoming = snap['config'];
+    if (incoming is! Map) return;
+    _optimisticConfig = null; // one config-bearing snapshot = one verdict
+    if (mapEquals(incoming, trace.value)) return;
+    if (clock.now().difference(trace.at) > _optimisticRevertWindow) return;
+    _configReverted = true;
   }
 
   /// Optimistic row edit (e.g. feedback) — mutates the row in place and

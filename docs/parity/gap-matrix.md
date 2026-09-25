@@ -106,7 +106,7 @@
 | C15 CUA 电脑操作 | 30+ 动作 + 权限面板(macOS 权限引导) | 无 | 缺失 | P2(倾向不做,标⚠️) | |
 | C16 提示词增强/建议草稿 | promptEnhance + suggestedPrompt | 无 | 缺失 | P2 | |
 | C17 编辑重发 workspaceMode | `editUserQuery {workspaceMode:'preserve'|'rewind'}` + 重置文件弹窗 | 编辑重发有;workspaceMode 参数与「对话+文件重置」弹窗待核 | 部分(待核) | P1 | |
-| C18 错误呈现 | chat.error.*(connectionLost/processExited/复制 TraceID/反馈带现场) | 订阅失败红条/重连黄条/被接管遮罩有;TraceID 复制/反馈带现场无 | 部分 | P1 | |
+| C18 错误呈现 | chat.error.*(connectionLost/processExited/复制 TraceID/反馈带现场) | 订阅失败红条/重连黄条/被接管遮罩有;TraceID 复制/反馈带现场无;空壳启动失败卡片+切换弹回提示有。09-25 定证:此前"无前台窗口工作区 turn 秒败"真因是 App createSession 载荷 config 缺 thought(冷 runtime 桌面无当前 level 可并入 → model creation 校验秒败),非桌面侧 bug——官方 web 是 facade 显式带 thought;App 已补三级默认链(所选 → prep currentValue → 'max')对齐,文案同步去"窗口"误导表述;空壳卡片保留为其他 turn 失败形态兜底 | 部分 | P1 | 🔨(09-25 thought 修复+文案待真机验收) |
 | C19 思考等级档位 | 9 档 off/noThink/on/low/medium/high/xhigh/max | 思考等级 chip 有(档位集合待核对) | 部分(待核) | P1 | |
 | C20 消息流核心 | turn 分组/加载更早/时间分隔/Markdown/工具卡/Diff/反馈/复制 | 已有(前轮对齐成果);markdown 代码块与 tool-call diff 默认收起(编辑类展开只显 diff,参数/输出 JSON 不透传);加载更早=滚动接近顶部自动预取(官方阈值 max(64, 2×视口))+prepend 视口锚定补偿(官方 scrollTop+=delta 语义),另加顶部下拉 rubber-band 手势强制加载(native-only 增强,官方 web 无手势) | 一致+超出 | — | 🔨(前轮成果 ✅;09-21 预取/锚定/手势待真机验收) |
 | C21 权限交互核心 | resolveInteraction optionId/freeText/action | 已有(allowOnce/allowAlways/deny/custom 本地化) | 一致 | — | |

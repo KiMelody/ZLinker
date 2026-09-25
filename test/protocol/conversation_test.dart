@@ -3,6 +3,7 @@
 // ignore_for_file: use_null_aware_elements, prefer_initializing_formals
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -455,6 +456,84 @@ void main() {
 
       expect(state.isRunning, isFalse);
       expect(state.canStop, isFalse);
+    });
+  });
+
+  group('optimistic config trace & revert detection (design 09-25 D3)', () {
+    late ConversationState state;
+
+    setUp(() {
+      state = ConversationState();
+    });
+
+    Map<String, dynamic> config(String model) => {
+      'provider': 'builtin',
+      'model': model,
+      'thought': 'enabled',
+    };
+
+    test('optimistic patch confirmed by a same-value snapshot raises no flag',
+        () {
+      _injectSnapshot(state, snapshot: {'config': config('A')});
+      state.optimisticPatch({'config': config('B')});
+      expect(state.currentModel, 'B');
+
+      _injectSnapshot(state, snapshot: {'config': config('B')});
+      expect(state.consumeConfigReverted(), isFalse,
+          reason: 'the authoritative snapshot agrees with the optimism');
+      expect(state.currentModel, 'B');
+    });
+
+    test('authoritative snapshot with a different value within 60s sets the '
+        'one-shot flag; the state.updated merge path never does', () {
+      _injectSnapshot(state, snapshot: {'config': config('A')});
+      state.optimisticPatch({'config': config('B')});
+
+      // Incremental confirmation (the normal accepted path): merging a
+      // patch — even with a different config — must not count as a revert.
+      state.applyFrame({
+        'payload': {
+          'kind': 'deltas',
+          'deltas': [
+            {'op': 'state.updated', 'patch': {'config': config('A')}},
+          ],
+        },
+        'fromSeq': 5,
+        'toSeq': 6,
+      }, onGap: () => fail('unexpected gap'));
+      expect(state.consumeConfigReverted(), isFalse);
+
+      // Whole-snapshot replacement with the desktop's old config: the
+      // switch command was lost — one flag, consumed on read.
+      _injectSnapshot(state, seq: 7, snapshot: {'config': config('A')});
+      expect(state.consumeConfigReverted(), isTrue);
+      expect(state.consumeConfigReverted(), isFalse,
+          reason: 'one-shot: consumed on read');
+    });
+
+    test('a differing snapshot past the 60s window raises no flag', () {
+      var now = DateTime(2026, 9, 25, 12);
+      withClock(Clock(() => now), () {
+        _injectSnapshot(state, snapshot: {'config': config('A')});
+        state.optimisticPatch({'config': config('B')});
+
+        now = now.add(const Duration(seconds: 61));
+        _injectSnapshot(state, snapshot: {'config': config('A')});
+        expect(state.consumeConfigReverted(), isFalse,
+            reason: 'stale optimism is not worth mentioning');
+      });
+    });
+
+    test('a second optimistic patch re-bases the trace on the newest value',
+        () {
+      _injectSnapshot(state, snapshot: {'config': config('A')});
+      state.optimisticPatch({'config': config('B')});
+      state.optimisticPatch({'config': config('C')});
+
+      // A snapshot with B differs from the LATEST optimistic value (C) —
+      // the verdict must be computed against the new trace.
+      _injectSnapshot(state, snapshot: {'config': config('B')});
+      expect(state.consumeConfigReverted(), isTrue);
     });
   });
 
