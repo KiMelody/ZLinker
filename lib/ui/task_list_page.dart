@@ -1216,6 +1216,8 @@ class _TaskListPageState extends State<TaskListPage>
     ].join(' · ');
     return SwipeActionsRow(
       actions: _swipeActions(session, entry),
+      trayRadius: ZRadius.tile,
+      childRadius: ZRadius.tile,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -1755,6 +1757,8 @@ class _TaskListPageState extends State<TaskListPage>
           horizontal: 8, vertical: ZListRow.gap),
       child: SwipeActionsRow(
         actions: _swipeActions(session, entry),
+        trayRadius: ZRadius.field,
+        childRadius: ZRadius.field,
         child: Material(
           color: highlight
               ? Colors.white.withValues(alpha: 0.1)
@@ -1831,10 +1835,15 @@ class _TaskListPageState extends State<TaskListPage>
 
   /// Left-swipe quick actions shared by the task rows: the same three verbs
   /// the long-press sheet offers for a fast pass over the list (归档 /
-  /// 标记未读 / 删除). Delete keeps its confirmation dialog.
+  /// 标记未读 / 删除). Delete keeps its confirmation dialog. Colors are
+  /// FOREGROUND tones on the neutral tray: brand sky for archive (dark
+  /// sky400 / light sky600), the sheet's neutral for read/unread, and the
+  /// destructive tone for delete — same language as the sheet entries.
   List<SwipeAction> _swipeActions(DeviceSession session, SessionEntry entry) {
     final archived = entry.raw['archived'] == true;
     final unread = entry.raw['unreadAt'] != null;
+    final archiveFg =
+        ZInk.isDark(context) ? ZColors.sky400 : ZColors.sky600;
     return [
       SwipeAction(
         icon: archived ? Icons.unarchive_outlined : Icons.archive_outlined,
@@ -1842,7 +1851,7 @@ class _TaskListPageState extends State<TaskListPage>
           context,
           archived ? 'tasks.action.unarchive' : 'tasks.action.archive',
         ),
-        color: ZColors.sky500,
+        fgColor: archiveFg,
         onTap: () => _runOp(() async {
           await session.setTaskArchived(entry.sessionId, !archived);
           await session.reloadTasks();
@@ -1856,7 +1865,7 @@ class _TaskListPageState extends State<TaskListPage>
           context,
           unread ? 'tasks.action.markRead' : 'tasks.action.markUnread',
         ),
-        color: ZColors.neutral600,
+        fgColor: ZInk.soft(context),
         onTap: () => _runOp(() async {
           await session.setTaskUnread(entry.sessionId, !unread);
           await session.reloadTasks();
@@ -1865,7 +1874,7 @@ class _TaskListPageState extends State<TaskListPage>
       SwipeAction(
         icon: Icons.delete_outline,
         label: tr(context, 'tasks.action.delete'),
-        color: ZColors.danger,
+        fgColor: ZInk.dangerTone(context),
         onTap: () => _deleteTaskDialog(session, entry),
       ),
     ];
@@ -2079,13 +2088,13 @@ class _TaskListPageState extends State<TaskListPage>
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_outline,
                   color: ZColors.danger,
                 ),
                 title: Text(
                   tr(sheetCtx, 'tasks.action.delete'),
-                  style: const TextStyle(color: ZColors.danger),
+                  style: TextStyle(color: ZColors.danger),
                 ),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();

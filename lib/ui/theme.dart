@@ -373,6 +373,21 @@ class ZInk {
   static Color dangerTone(BuildContext c) =>
       _dark(c) ? ZColors.danger : ZColors.dangerLight;
 
+  /// Success tone (`--color-success` foreground family): light reuses the
+  /// official measured confirmation foreground — the bright dark-mode
+  /// emerald ([ZColors.success]) is unreadable as 11-12px text on light
+  /// surfaces (~1.5:1).
+  static Color successTone(BuildContext c) =>
+      _dark(c) ? ZColors.success : ZColors.pillSuccessFgLight;
+
+  /// Warning tone (amber foreground family): light lifts the literal
+  /// official `--color-warning` from the theme-zai-light bundle (asar
+  /// @312933174, 09-29 research) — the same value official light also
+  /// uses for `--color-usage-chart-5`, so [ZColors.usageOrangeLight] is
+  /// reused instead of a duplicate constant.
+  static Color warningTone(BuildContext c) =>
+      _dark(c) ? ZColors.warning : ZColors.usageOrangeLight;
+
   /// Usage accents (chart-1/5 + confirmation-foreground): official light
   /// mode deepens and saturates, so these branch (design.md §3b).
   static Color usageBlue(BuildContext c) =>
