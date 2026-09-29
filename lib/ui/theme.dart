@@ -94,6 +94,28 @@ abstract final class ZSpacing {
   static const double emptyState = 32;
 }
 
+/// Wide-screen content-column cap for secondary pages (device usage,
+/// automations, settings, providers…). Same value as the chat message
+/// column's width cap, so every wide surface converges on one reading
+/// width instead of stretching cards across a tablet.
+const double zContentMaxWidth = 848;
+
+/// Page-body padding for card-list screens: the fixed [ZSpacing.screen]
+/// edge plus the horizontal safe-area inset (display cutouts bite in
+/// landscape). Portrait on a notch-free device sees inset = 0, i.e. the
+/// exact pre-safe-area numbers. Pages whose body uses a different fixed
+/// edge pass [top] / [horizontal] to keep their portrait numbers.
+EdgeInsets zScreenPadding(
+  BuildContext context, {
+  double? top,
+  double bottom = 0,
+  double horizontal = ZSpacing.screen,
+}) {
+  final pad = MediaQuery.paddingOf(context);
+  return EdgeInsets.fromLTRB(horizontal + pad.left, top ?? ZSpacing.screen,
+      horizontal + pad.right, bottom);
+}
+
 /// Corner-radius ladder — the only radius values allowed in `lib/ui/`.
 /// Eleven ad-hoc literals (3/4/6/7/8/10/12/14/18/20/22) collapse onto these
 /// five tiers; every call site spells the tier it means.

@@ -268,7 +268,12 @@ class _OffPeakPageState extends State<OffPeakPage>
           }
           final view =
               _tabs.index == 0 ? _settingsView(context) : _historyView(context);
-          return RefreshIndicator(onRefresh: _load, child: view);
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: zContentMaxWidth),
+              child: RefreshIndicator(onRefresh: _load, child: view),
+            ),
+          );
         },
       ),
     );
@@ -278,7 +283,7 @@ class _OffPeakPageState extends State<OffPeakPage>
   Widget _settingsView(BuildContext context) {
     final active = _tasks.where((t) => !t.terminal).toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      padding: zScreenPadding(context, bottom: 96),
       children: [
         if ((_status?.entitled ?? true) && active.isEmpty && !_bannerDismissed)
           _newTaskBanner(context),
@@ -313,7 +318,7 @@ class _OffPeakPageState extends State<OffPeakPage>
   Widget _historyView(BuildContext context) {
     final history = _tasks.where((t) => t.terminal).toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      padding: zScreenPadding(context, bottom: 96),
       children: [
         if (history.isNotEmpty)
           for (final t in history) ...[

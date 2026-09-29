@@ -9,6 +9,7 @@ import 'theme.dart';
 import 'ui_settings.dart';
 import 'widgets/device_name.dart';
 import 'widgets/dropdown_field.dart';
+import 'widgets/sheet_scaffold.dart';
 
 /// Combined scheduling hub: server-side device automations on top, local
 /// scheduled messages below (the two coexist — local send works offline,
@@ -51,10 +52,13 @@ class _ScheduledPageState extends State<ScheduledPage> {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (c) => _AddSheet(
-        devices: devices,
-        store: widget.store,
-        hub: widget.hub,
+      builder: (c) => zSheetScaffold(
+        c,
+        child: _AddSheet(
+          devices: devices,
+          store: widget.store,
+          hub: widget.hub,
+        ),
       ),
     );
     if (created == true && mounted) {
@@ -345,8 +349,8 @@ class _AddSheetState extends State<_AddSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
-          20 + MediaQuery.of(context).viewInsets.bottom),
+      padding: const EdgeInsets.fromLTRB(ZSpacing.screen, 20, ZSpacing.screen,
+          20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

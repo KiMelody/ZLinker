@@ -17,6 +17,7 @@ import 'task_list_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
 import 'widgets/device_name.dart';
+import 'widgets/sheet_scaffold.dart';
 
 /// Home: the device list with live native status. Tap a card to open the
 /// native task list (or WebView fallback), long-term management via the
@@ -243,8 +244,10 @@ class _DevicesPageState extends State<DevicesPage>
   void _showAddSheet() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
-      builder: (c) => SafeArea(
+      builder: (c) => zSheetScaffold(
+        c,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -443,7 +446,7 @@ class _DevicesPageState extends State<DevicesPage>
               // Always scrollable: a one-device list must still accept the
               // pull gesture for the refresh indicator.
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              padding: zScreenPadding(context, bottom: 96),
               itemCount: devices.length,
               // The row keeps no permanent drag handle (R8): reordering is a
               // long press anywhere on the card, on every platform.

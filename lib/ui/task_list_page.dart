@@ -21,6 +21,7 @@ import 'remote_page.dart';
 import 'theme.dart';
 import 'ui_settings.dart';
 import 'widgets/device_name.dart';
+import 'widgets/sheet_scaffold.dart';
 import 'widgets/swipe_actions.dart';
 
 /// Native task list of one device (official mobile layout): a connection
@@ -346,6 +347,13 @@ class _TaskListPageState extends State<TaskListPage>
       backgroundColor: isDark
           ? ZColors.darkBackground
           : ZColors.lightBackground,
+      // Immersive cutout handling: SafeArea lives inside each column so the
+      // sidebar color block and the divider extend behind the cutout / status
+      // strip (no Scaffold-background color seam) while content still clears
+      // the insets. left/right are explicitly interleaved false so each column
+      // pads only its own screen edge — the pane stays flush against the
+      // divider even when the far screen edge carries a cutout inset, and
+      // vice versa.
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -353,26 +361,38 @@ class _TaskListPageState extends State<TaskListPage>
             width: kSidebarWidth,
             child: ColoredBox(
               color: isDark ? ZColors.darkSidebar : ZColors.lightSidebar,
-              child: _desktopSidebar(context),
+              child: SafeArea(
+                left: true,
+                top: true,
+                bottom: true,
+                right: false,
+                child: _desktopSidebar(context),
+              ),
             ),
           ),
           Container(width: 1, color: const Color(0xFF333333)),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? ZColors.darkBackground
-                      : ZColors.lightBackground,
-                  borderRadius: BorderRadius.circular(ZRadius.tile),
-                  border: Border.all(color: ZInk.hairline(context)),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(ZRadius.tile),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 320),
-                    child: _chatPane(context),
+            child: SafeArea(
+              left: false,
+              top: true,
+              bottom: true,
+              right: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? ZColors.darkBackground
+                        : ZColors.lightBackground,
+                    borderRadius: BorderRadius.circular(ZRadius.tile),
+                    border: Border.all(color: ZInk.hairline(context)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(ZRadius.tile),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 320),
+                      child: _chatPane(context),
+                    ),
                   ),
                 ),
               ),
@@ -488,7 +508,8 @@ class _TaskListPageState extends State<TaskListPage>
               child: session == null || session.workspaces.isEmpty
                   ? _fallback(context, session)
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 16),
+                      padding: zScreenPadding(context,
+                          top: 0, bottom: 16, horizontal: 6),
                       children: [
                         ..._desktopPinned(context, session),
                         for (final ws in session.workspaces)
@@ -987,7 +1008,7 @@ class _TaskListPageState extends State<TaskListPage>
             // Always scrollable: a short list (one workspace, no tasks) must
             // still accept the pull gesture for the refresh indicator.
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+            padding: zScreenPadding(context, top: 12, bottom: 32, horizontal: 12),
             itemCount: rows.length,
             itemBuilder: (context, i) => rows[i],
           ),
@@ -1002,7 +1023,9 @@ class _TaskListPageState extends State<TaskListPage>
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetCtx) => SafeArea(
+      isScrollControlled: true,
+      builder: (sheetCtx) => zSheetScaffold(
+        sheetCtx,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
               ZSpacing.screen, 0, ZSpacing.screen, 24),
@@ -1095,7 +1118,9 @@ class _TaskListPageState extends State<TaskListPage>
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetCtx) => SafeArea(
+      isScrollControlled: true,
+      builder: (sheetCtx) => zSheetScaffold(
+        sheetCtx,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

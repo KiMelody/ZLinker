@@ -274,3 +274,13 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - 测试:subagent_detail_page_test +1(初始贴底/流式跟随/上翻停跟+箭头淡入/点箭头回底+淡出)并同步收起断言;chat_page_test 内联时间线用例暴露无 diff 行 Row 嵌套 Expanded 布局崩溃,已修(标题 Expanded 平铺进各分支的 Row,不跨层嵌套)。全量 728 绿,analyze 0 问题;令牌闸门 fontSize=8/Radius=0/withOpacity=0。
 - 模拟器验收(adb 实测 2026-09-23):详情页真实数据渲染正常(全行类型:userInput/探索/思考过程/终端/已写入/总结)、**R2 默认收起+点击展开+diff 红绿行像素级验证通过**、订阅超时→重试恢复正常。R1 滚动三件套模拟器未实证:验收载体子会话内容不满一屏(无滚动余量,箭头按设计不出现)+桌面 bridge 崩循环(观测者重型会话推大快照所致)挡住运行中 subagent 的流式 delta,属环境限制非代码问题。
 - ✅ 真机验收(用户 2026-09-23,debug 构建覆盖安装):滚动三件套(打开定位/回底箭头/流式跟随)与 diff 收起全部通过。
+
+## 横屏适配批次实现记录(2026-09-29,任务 09-29-landscape-hardening,待验收)
+
+- **P0 溢出修复**:横屏矮视口(390 高)下无滚动能力的 bottom sheet 全量迁移——共享骨架 `zSheetScaffold`(viewInsets 让位 > SafeArea > 0.85 屏高限 > 滚动,`isScrollControlled: true` 必传)覆盖 devices 添加设备/task_list 整理与长按菜单/chat 长按菜单/scheduled 添加/model_providers 添加表单/quota 重置对话框(SingleChildScrollView);automations 模板、provider API 格式与模型 ID 单选两处 sheet 加 ConstrainedBox 0.85 限高;chat `_JsonSheet` 补 0.7 限高。表单类改调用方包裹(`builder: => zSheetScaffold(ctx, child: sheet)`),sheet 内部去自带的 viewInsets padding(双让位)。
+- **安全区**:卡片列表页 body padding 统一 `zScreenPadding()`(16px 固定边 + 横屏挖孔 inset 叠加;竖屏无 inset 数值零变化),覆盖 devices/automations/off_peak/task_list/settings/desktop_settings/device_usage/provider_settings/model_providers。
+- **宽屏列宽**:次级页 body 外包 `Center > ConstrainedBox(zContentMaxWidth=848)`(与 chat 消息列 cap 同值),RefreshIndicator 在内保持全宽下拉,覆盖 device_usage/automations/off_peak/settings 族/model_providers/provider_settings。
+- **chat 矮视口轻量缓解**(方向 A):高度 <480 时二级标题行隐工作区 chip、composer 工具行折叠为展开按钮(unfold_more/unfold_less,i18n chat.input.toolsExpand/Collapse)。竖屏 844 不触发。
+- 测试:sheet_scaffold_test 新增(token 值/zScreenPadding inset 叠加/0.85 限高滚动/键盘让位按钮可点);task_list_page_test 横屏单栏用例;全量绿,analyze 0 警告。
+- ⚠️ 已知限制:手机横屏+软键盘下聊天输入仍不可用(键盘 250px 占掉 390 高的大半,残余输入区过矮)——轻量缓解只覆盖无键盘状态;根治需方向 B。
+- 远期项(方向 B,挂 backlog):聊天全屏输入覆盖层(横屏唤起键盘时切全屏编辑,发送返回);次级页面平板双栏内嵌(列表+详情同屏)。锁竖屏(方向 C)已排除(用户拍板)。

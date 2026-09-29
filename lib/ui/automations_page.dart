@@ -71,28 +71,34 @@ class _AutomationsPageState extends State<AutomationsPage> {
               ],
             ),
           ),
-          body: devices.isEmpty
-              ? Center(
-                  child: Text(tr(context, 'sched.noDevices'),
-                      style: TextStyle(color: ZInk.muted(context))))
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: _devicePicker(devices),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: zContentMaxWidth),
+              child: devices.isEmpty
+                  ? Center(
+                      child: Text(tr(context, 'sched.noDevices'),
+                          style: TextStyle(color: ZInk.muted(context))))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          child: _devicePicker(devices),
+                        ),
+                        Expanded(
+                          child: AutomationsPane(
+                            key: ValueKey('auto-$_deviceId'),
+                            session: _deviceId == null
+                                ? null
+                                : widget.hub.sessionOf(_deviceId!),
+                            onRetry: () =>
+                                widget.hub.syncWith(widget.store.devices),
+                          ),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      child: AutomationsPane(
-                        key: ValueKey('auto-$_deviceId'),
-                        session: _deviceId == null
-                            ? null
-                            : widget.hub.sessionOf(_deviceId!),
-                        onRetry: () => widget.hub.syncWith(widget.store.devices),
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+          ),
         );
       },
     );
@@ -371,7 +377,7 @@ class _AutomationsPaneState extends State<AutomationsPane> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+        padding: zScreenPadding(context, top: 8, bottom: 88),
         itemCount: cards.length,
         separatorBuilder: (context, index) => const SizedBox.shrink(),
         itemBuilder: (context, i) => cards[i],
@@ -392,37 +398,43 @@ class _AutomationsPaneState extends State<AutomationsPane> {
 Future<void> _pickTemplate() async {
   final picked = await showModalBottomSheet<_Idea>(
     context: context,
+    isScrollControlled: true,
     showDragHandle: true,
-    builder: (sheetCtx) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: Text(tr(sheetCtx, 'auto.templates'),
-                style: ZType.heading),
-          ),
-          for (final idea in _templateIdeas)
-            ListTile(
-              dense: true,
-              title: Text(tr(sheetCtx, 'auto.tpl.${idea.key}.title'),
-                  style: ZType.bodyStrong),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr(sheetCtx, 'auto.tpl.${idea.key}.schedule'),
-                      style:
-                          ZType.caption.copyWith(color: ZColors.sky500)),
-                  Text(tr(sheetCtx, 'auto.tpl.${idea.key}.desc'),
-                      style: ZType.caption.copyWith(color: ZInk.muted(sheetCtx))),
-                ],
-              ),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 14, color: ZInk.ghost(sheetCtx)),
-              onTap: () => Navigator.pop(sheetCtx, idea),
+    builder: (sheetCtx) => ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(sheetCtx).height * 0.85,
+      ),
+      child: SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              child: Text(tr(sheetCtx, 'auto.templates'),
+                  style: ZType.heading),
             ),
-        ],
+            for (final idea in _templateIdeas)
+              ListTile(
+                dense: true,
+                title: Text(tr(sheetCtx, 'auto.tpl.${idea.key}.title'),
+                    style: ZType.bodyStrong),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr(sheetCtx, 'auto.tpl.${idea.key}.schedule'),
+                        style:
+                            ZType.caption.copyWith(color: ZColors.sky500)),
+                    Text(tr(sheetCtx, 'auto.tpl.${idea.key}.desc'),
+                        style: ZType.caption.copyWith(color: ZInk.muted(sheetCtx))),
+                  ],
+                ),
+                trailing: Icon(Icons.arrow_forward_ios,
+                    size: 14, color: ZInk.ghost(sheetCtx)),
+                onTap: () => Navigator.pop(sheetCtx, idea),
+              ),
+          ],
+        ),
       ),
     ),
   );
