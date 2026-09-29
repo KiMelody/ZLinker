@@ -151,6 +151,37 @@ class ProviderModelEntry {
       ],
     );
   }
+
+  /// `effectiveConfig.properties.<key>` — manual-capability booleans.
+  /// Missing keys read false (official T5 backfill: `?? false`).
+  bool _propsBool(String key) =>
+      effectiveConfig['properties'] is Map &&
+      (effectiveConfig['properties'] as Map)[key] == true;
+
+  bool get effSupportsJsonSchemaOutput =>
+      _propsBool('supportsJsonSchemaOutput');
+
+  bool get effSupportsNativeWebSearch => _propsBool('supportsNativeWebSearch');
+
+  bool get effSupportsMidConversationSystem =>
+      _propsBool('supportsMidConversationSystem');
+
+  /// `effectiveConfig.properties.inputFormat.supportsImage` — the edit
+  /// dialog's vision prefill and the model row's vision badge source.
+  bool get effSupportsImage {
+    final props = effectiveConfig['properties'];
+    final fmt = props is Map ? props['inputFormat'] : null;
+    return fmt is Map && fmt['supportsImage'] == true;
+  }
+
+  /// `effectiveConfig.optionSpecs.reasoningLevel.values` — the read-only
+  /// reasoning chips source; empty hides the section (official T5).
+  List<String> get effReasoningLevels {
+    final specs = effectiveConfig['optionSpecs'];
+    final rl = specs is Map ? specs['reasoningLevel'] : null;
+    final values = rl is Map ? rl['values'] : null;
+    return [for (final v in values is List ? values : const []) '$v'];
+  }
 }
 
 /// One provider row of the view (account `account:*` or personal).

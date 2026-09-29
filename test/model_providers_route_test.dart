@@ -350,4 +350,291 @@ void main() {
             .length,
         greaterThanOrEqualTo(2));
   });
+
+  /// The Switch of the dialog row carrying [label] — switches sit next to
+  /// the label inside a shared Row. Scoped to the AlertDialog so the model
+  /// row's 视觉 badge (page behind the dialog) never steals the match.
+  Finder dialogRowSwitch(String label) {
+    final row = find
+        .ancestor(
+          of: find.descendant(
+              of: find.byType(AlertDialog), matching: find.text(label)),
+          matching: find.byType(Row),
+        )
+        .first;
+    return find.descendant(of: row, matching: find.byType(Switch)).first;
+  }
+
+  testWidgets('manual save writes the extractManualModelConfig whitelist',
+      (WidgetTester tester) async {
+    final view = providerSettingsView() as Map;
+    final session = FakeDeviceSession(
+      deviceId: 'd1',
+      params: paramsOf('3.14.3'),
+      channelHandler: (channel, method, args) async {
+        if (method == 'getView') return view;
+        if (method == 'addPersonalModel') {
+          // Whitelist: contextWindow + three capability booleans (false
+          // written even when off) + inputFormat as the official T0
+          // three-key pick; no reasoning level, no maxOutputTokens (empty
+          // field), useRecommendedConfig=false.
+          expect(args, [
+            'p1',
+            'm1',
+            {
+              'properties': {
+                'contextWindow': 128000,
+                'supportsJsonSchemaOutput': false,
+                'supportsNativeWebSearch': false,
+                'supportsMidConversationSystem': false,
+                'inputFormat': {
+                  'supportsImage': true,
+                  'supportsVideo': false,
+                  'supportsPdf': false,
+                },
+              },
+            },
+            false,
+          ]);
+          view['revision'] = '[31,4]';
+          (view['providers'] as List)[1]['models'] = [
+            {
+              'modelId': 'm1',
+              'enabled': true,
+              'executable': true,
+              'useRecommendedConfig': false,
+              'effectiveConfig': {
+                'properties': {
+                  'contextWindow': 128000,
+                  'inputFormat': {'supportsImage': true},
+                },
+              },
+              'issues': [],
+            },
+          ];
+          return view;
+        }
+        throw StateError('unexpected $method');
+      },
+    );
+    addTearDown(() => session.dispose());
+    await tester.pumpWidget(wrap(ModelProvidersPage(session: session)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('My Relay'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加模型'));
+    await tester.pumpAndSettle();
+
+    // Manual mode: switch smart config off → the advanced toggle appears.
+    await tester.tap(dialogRowSwitch('智能配置'));
+    await tester.pumpAndSettle();
+    expect(find.text('高级配置'), findsOneWidget);
+
+    // Expand and flip vision on (collapsed by default).
+    await tester.tap(find.text('高级配置'));
+    await tester.pumpAndSettle();
+    await tester.tap(dialogRowSwitch('视觉'));
+
+    await tester.enterText(find.widgetWithText(TextField, '模型 ID'), 'm1');
+    await tester.enterText(
+        find.widgetWithText(TextField, '上下文窗口'), '128000');
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('保存')));
+    await tester.pumpAndSettle();
+
+    // Dialog closed, the reply view rendered the new model row.
+    expect(find.text('高级配置'), findsNothing);
+    expect(find.text('m1'), findsOneWidget);
+  });
+
+  testWidgets('smart config hides the advanced section and writes no fields',
+      (WidgetTester tester) async {
+    final view = providerSettingsView() as Map;
+    final session = FakeDeviceSession(
+      deviceId: 'd1',
+      params: paramsOf('3.14.3'),
+      channelHandler: (channel, method, args) async {
+        if (method == 'getView') return view;
+        if (method == 'addPersonalModel') {
+          // Official addPersonalModel(pid, mid, {}, true): the desktop
+          // fills in the recommended values.
+          expect(args, ['p1', 'm2', {}, true]);
+          view['revision'] = '[31,4]';
+          (view['providers'] as List)[1]['models'] = [
+            {
+              'modelId': 'm2',
+              'enabled': true,
+              'executable': true,
+              'useRecommendedConfig': true,
+              'effectiveConfig': const {},
+              'issues': const [],
+            },
+          ];
+          return view;
+        }
+        throw StateError('unexpected $method');
+      },
+    );
+    addTearDown(() => session.dispose());
+    await tester.pumpWidget(wrap(ModelProvidersPage(session: session)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('My Relay'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加模型'));
+    await tester.pumpAndSettle();
+
+    // Smart (default on): no advanced copy anywhere in the dialog.
+    expect(find.text('高级配置'), findsNothing);
+    expect(find.text('视觉'), findsNothing);
+    expect(find.text('结构化输出'), findsNothing);
+
+    await tester.enterText(find.widgetWithText(TextField, '模型 ID'), 'm2');
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('保存')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('m2'), findsOneWidget);
+  });
+
+  testWidgets('edit backfills capabilities and reasoning from effectiveConfig',
+      (WidgetTester tester) async {
+    final view = providerSettingsView() as Map;
+    final session = FakeDeviceSession(
+      deviceId: 'd1',
+      params: paramsOf('3.14.3'),
+      channelHandler: (channel, method, args) async {
+        if (method == 'getView') return view;
+        if (method == 'savePersonalModelDraft') {
+          // Toggled 结构化输出 off → the boolean diff rode the whitelist
+          // draft; reasoning level stays unwritten.
+          expect(args, [
+            {
+              'providerId': 'p1',
+              'originalModelId': 'm-vision',
+              'nextModelId': 'm-vision',
+              'personalConfig': {
+                'properties': {
+                  'supportsJsonSchemaOutput': false,
+                  'supportsNativeWebSearch': false,
+                  'supportsMidConversationSystem': false,
+                  'inputFormat': {
+                    'supportsImage': true,
+                    'supportsVideo': false,
+                    'supportsPdf': false,
+                  },
+                },
+                'optionSpecs': {'maxOutputTokens': 8192},
+              },
+              'basedOnRevision': '[30,4]',
+              'useRecommendedConfig': false,
+            },
+          ]);
+          view['revision'] = '[31,4]';
+          return view;
+        }
+        throw StateError('unexpected $method');
+      },
+    );
+    addTearDown(() => session.dispose());
+    (view['providers'] as List)[1]['models'] = [
+      {
+        'modelId': 'm-vision',
+        'enabled': true,
+        'executable': true,
+        'useRecommendedConfig': false,
+        'effectiveConfig': {
+          'properties': {
+            'inputFormat': {'supportsImage': true},
+            'supportsJsonSchemaOutput': true,
+          },
+          'optionSpecs': {
+            // Distinct from the fresh-create low/high/max default —
+            // proves the chips read the effective config.
+            'reasoningLevel': {'values': ['low', 'mid', 'high']},
+            'maxOutputTokens': 8192,
+          },
+        },
+        'issues': [],
+      },
+    ];
+    await tester.pumpWidget(wrap(ModelProvidersPage(session: session)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('My Relay'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.edit_outlined).first);
+    await tester.pumpAndSettle();
+
+    // Manual model → the advanced toggle is there; expand it.
+    await tester.tap(find.text('高级配置'));
+    await tester.pumpAndSettle();
+
+    // Backfill: vision + structured output on (?? false semantics).
+    expect(
+        tester.widget<Switch>(dialogRowSwitch('视觉')).value, isTrue);
+    expect(tester.widget<Switch>(dialogRowSwitch('结构化输出')).value, isTrue);
+    expect(tester.widget<Switch>(dialogRowSwitch('原生联网搜索')).value, isFalse);
+    // Reasoning chips come from the effective values.
+    expect(find.text('low'), findsOneWidget);
+    expect(find.text('mid'), findsOneWidget);
+    expect(find.text('high'), findsOneWidget);
+    expect(find.text('max'), findsNothing);
+
+    // Toggle 结构化输出 off and save → configChanged via the boolean diff.
+    await tester.tap(dialogRowSwitch('结构化输出'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('保存')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('高级配置'), findsNothing);
+    expect(
+        session.channelCalls.any((c) => c.$2 == 'savePersonalModelDraft'),
+        isTrue);
+  });
+
+  testWidgets('vision model rows render the 视觉 badge',
+      (WidgetTester tester) async {
+    final view = providerSettingsView() as Map;
+    (view['providers'] as List)[1]['models'] = [
+      {
+        'modelId': 'glm-4.7v-flash',
+        'enabled': true,
+        'executable': true,
+        'useRecommendedConfig': true,
+        'effectiveConfig': {
+          'properties': {
+            'inputFormat': {'supportsImage': true},
+          },
+        },
+        'issues': [],
+      },
+      {
+        'modelId': 'glm-4.7-flash',
+        'enabled': true,
+        'executable': true,
+        'useRecommendedConfig': true,
+        'effectiveConfig': const {},
+        'issues': [],
+      },
+    ];
+    final session = FakeDeviceSession(
+      deviceId: 'd1',
+      params: paramsOf('3.14.3'),
+      channelHandler: (channel, method, args) async => view,
+    );
+    addTearDown(() => session.dispose());
+    await tester.pumpWidget(wrap(ModelProvidersPage(session: session)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('My Relay'));
+    await tester.pumpAndSettle();
+
+    // One badge, next to the vision-capable model only.
+    expect(find.text('glm-4.7v-flash'), findsOneWidget);
+    expect(find.text('glm-4.7-flash'), findsOneWidget);
+    expect(find.text('视觉'), findsOneWidget);
+  });
 }

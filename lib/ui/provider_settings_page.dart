@@ -785,7 +785,7 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
     if (entry == null) return;
     final limits =
         existing == null ? null : modelNumericLimits(existing);
-    final result = await showDialog<(String, bool, int?, int?)>(
+    final result = await showDialog<_ModelDialogResult>(
       context: context,
       builder: (context) => _ModelDialog(
         title: tr(context,
@@ -794,40 +794,71 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
         initialSmart: existing?.useRecommendedConfig ?? true,
         initialContextWindow: limits?.contextWindow,
         initialMaxOutput: limits?.maxOutputTokens,
+        initialVision: existing?.effSupportsImage ?? false,
+        initialJsonSchema: existing?.effSupportsJsonSchemaOutput ?? false,
+        initialWebSearch: existing?.effSupportsNativeWebSearch ?? false,
+        initialMidSystem: existing?.effSupportsMidConversationSystem ?? false,
+        // Official T5: values come from the effective config; a fresh model
+        // shows the recommended low/high/max trio.
+        reasoningLevels:
+            existing?.effReasoningLevels ?? const ['low', 'high', 'max'],
         isEdit: existing != null,
         fetchIds: entry.isAccount ? null : _fetchEndpointIds,
       ),
     );
     if (result == null) return;
-    final (modelId, smart, contextWindow, maxOutput) = result;
+    final smart = result.smart;
+    // Manual-save whitelist (official extractManualModelConfig): context
+    // window + the three capability booleans (always written, true or
+    // false) + inputFormat as the official T0 three-key pick
+    // {supportsImage, supportsVideo, supportsPdf} (video/pdf have no UI
+    // switches and stay false). The reasoning level stays unwritten — the
+    // overlay merge falls back to the template's recommended levels, so we
+    // never pin them down.
     final config = <String, Object?>{
-      if (!smart && contextWindow != null)
-        'properties': {'contextWindow': contextWindow},
-      if (!smart && maxOutput != null)
-        'optionSpecs': {'maxOutputTokens': maxOutput},
+      if (!smart)
+        'properties': {
+          if (result.contextWindow != null)
+            'contextWindow': result.contextWindow,
+          'supportsJsonSchemaOutput': result.jsonSchema,
+          'supportsNativeWebSearch': result.webSearch,
+          'supportsMidConversationSystem': result.midSystem,
+          'inputFormat': {
+            'supportsImage': result.vision,
+            'supportsVideo': false,
+            'supportsPdf': false,
+          },
+        },
+      if (!smart && result.maxOutput != null)
+        'optionSpecs': {'maxOutputTokens': result.maxOutput},
     };
     try {
       if (existing == null) {
-        final res = await _port.addPersonalModel(widget.providerId, modelId,
+        final res = await _port.addPersonalModel(widget.providerId, result.modelId,
             modelConfig: config, useRecommendedConfig: smart);
         _apply(ProviderSettingsView.parse(res));
       } else {
-        if (modelId != existing.modelId) {
+        if (result.modelId != existing.modelId) {
           final res = await _port.renamePersonalModel(
-              widget.providerId, existing.modelId, modelId);
+              widget.providerId, existing.modelId, result.modelId);
           // Applying the rename reply refreshes the revision the draft
           // below CASes on — never reuse the pre-rename one.
           _apply(ProviderSettingsView.parse(res));
         }
         final configChanged = smart != existing.useRecommendedConfig ||
             (!smart &&
-                (contextWindow != limits?.contextWindow ||
-                    maxOutput != limits?.maxOutputTokens));
+                (result.contextWindow != limits?.contextWindow ||
+                    result.maxOutput != limits?.maxOutputTokens ||
+                    result.vision != existing.effSupportsImage ||
+                    result.jsonSchema != existing.effSupportsJsonSchemaOutput ||
+                    result.webSearch != existing.effSupportsNativeWebSearch ||
+                    result.midSystem !=
+                        existing.effSupportsMidConversationSystem));
         if (configChanged) {
           final res = await _port.savePersonalModelDraft(
             providerId: widget.providerId,
-            modelId: modelId,
-            newModelId: modelId,
+            modelId: result.modelId,
+            newModelId: result.modelId,
             personalConfig: config,
             basedOnRevision: _view?.revision ?? '',
             useRecommendedConfig: smart,
@@ -1218,13 +1249,39 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(model.modelId,
-                    style: ZType.body.copyWith(
-                        color: model.enabled
-                            ? ZInk.solid(context)
-                            : ZInk.faint(context)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(model.modelId,
+                          style: ZType.body.copyWith(
+                              color: model.enabled
+                                  ? ZInk.solid(context)
+                                  : ZInk.faint(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    // Vision pill (mock panel ④): sky outline on a light
+                    // wash, caption size — mirrors the official badge.
+                    if (model.effSupportsImage) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: ZColors.sky500.withValues(alpha: 0.10),
+                          borderRadius:
+                              BorderRadius.circular(ZRadius.pill),
+                          border: Border.all(
+                              color:
+                                  ZColors.sky500.withValues(alpha: 0.45)),
+                        ),
+                        child: Text(tr(context, 'providers.capVision'),
+                            style: ZType.caption
+                                .copyWith(color: ZColors.sky500)),
+                      ),
+                    ],
+                  ],
+                ),
                 if (model.issues.isNotEmpty)
                   Text(model.issues.first.message,
                       style: ZType.caption
@@ -1345,15 +1402,49 @@ class _ApiFormatField extends StatelessWidget {
   }
 }
 
+/// Dialog's payload — the four capability booleans ride along so the
+/// manual-save whitelist (official extractManualModelConfig) can compose
+/// `properties` on the caller side.
+class _ModelDialogResult {
+  final String modelId;
+  final bool smart;
+  final int? contextWindow;
+  final int? maxOutput;
+  final bool vision;
+  final bool jsonSchema;
+  final bool webSearch;
+  final bool midSystem;
+  const _ModelDialogResult({
+    required this.modelId,
+    required this.smart,
+    required this.contextWindow,
+    required this.maxOutput,
+    required this.vision,
+    required this.jsonSchema,
+    required this.webSearch,
+    required this.midSystem,
+  });
+}
+
 /// 添加模型 / 编辑模型配置 dialog (official form): smart-config switch +
 /// model id (add mode carries the /models fetch entry — pick one id to
-/// fill the field) + context window + max output (disabled while smart).
+/// fill the field) + context window + max output (disabled while smart) +
+/// the advanced section (manual mode only: vision input, three capability
+/// switches, read-only reasoning chips).
 class _ModelDialog extends StatefulWidget {
   final String title;
   final String? initialModelId;
   final bool initialSmart;
   final int? initialContextWindow;
   final int? initialMaxOutput;
+  final bool initialVision;
+  final bool initialJsonSchema;
+  final bool initialWebSearch;
+  final bool initialMidSystem;
+
+  /// Read-only reasoning chips; empty hides the section (official T5
+  /// backfill). A fresh model shows the recommended low/high/max trio.
+  final List<String> reasoningLevels;
   final bool isEdit;
 
   /// /models fetch seam (detail page's current form values); null hides
@@ -1363,9 +1454,14 @@ class _ModelDialog extends StatefulWidget {
     required this.title,
     required this.initialSmart,
     required this.isEdit,
+    required this.reasoningLevels,
     this.initialModelId,
     this.initialContextWindow,
     this.initialMaxOutput,
+    this.initialVision = false,
+    this.initialJsonSchema = false,
+    this.initialWebSearch = false,
+    this.initialMidSystem = false,
     this.fetchIds,
   });
 
@@ -1381,6 +1477,11 @@ class _ModelDialogState extends State<_ModelDialog> {
   late final TextEditingController _max = TextEditingController(
       text: widget.initialMaxOutput?.toString() ?? '');
   late bool _smart = widget.initialSmart;
+  late bool _vision = widget.initialVision;
+  late bool _jsonSchema = widget.initialJsonSchema;
+  late bool _webSearch = widget.initialWebSearch;
+  late bool _midSystem = widget.initialMidSystem;
+  bool _advOpen = false;
   bool _fetching = false;
 
   @override
@@ -1460,7 +1561,16 @@ class _ModelDialogState extends State<_ModelDialog> {
     int? parse(TextEditingController c) => int.tryParse(c.text.trim());
     Navigator.pop(
       context,
-      (id, _smart, parse(_context), parse(_max)),
+      _ModelDialogResult(
+        modelId: id,
+        smart: _smart,
+        contextWindow: parse(_context),
+        maxOutput: parse(_max),
+        vision: _vision,
+        jsonSchema: _jsonSchema,
+        webSearch: _webSearch,
+        midSystem: _midSystem,
+      ),
     );
   }
 
@@ -1470,12 +1580,29 @@ class _ModelDialogState extends State<_ModelDialog> {
       _context.text = widget.initialContextWindow?.toString() ?? '';
       _max.text = widget.initialMaxOutput?.toString() ?? '';
       _smart = widget.initialSmart;
+      _vision = widget.initialVision;
+      _jsonSchema = widget.initialJsonSchema;
+      _webSearch = widget.initialWebSearch;
+      _midSystem = widget.initialMidSystem;
     });
   }
+
+  /// Compact action button (mock panel ②: 36dp visual, radius 8) — the
+  /// global `MaterialTapTargetSize.padded` keeps the hit area ≥48dp.
+  ButtonStyle get _actionStyle => TextButton.styleFrom(
+        minimumSize: const Size(64, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ZRadius.field)),
+      );
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // Mock panel ②: screen width 392 → dialog 360 (inset 16), not the
+      // M3 default 280.
+      insetPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(widget.title, style: ZType.heading),
       content: SingleChildScrollView(
         child: Column(
@@ -1493,8 +1620,10 @@ class _ModelDialogState extends State<_ModelDialog> {
             ),
             TextField(
               controller: _id,
-              decoration:
-                  InputDecoration(labelText: tr(context, 'providers.modelId')),
+              decoration: InputDecoration(
+                labelText: tr(context, 'providers.modelId'),
+                isDense: true,
+              ),
             ),
             if (!widget.isEdit && widget.fetchIds != null)
               Align(
@@ -1518,7 +1647,9 @@ class _ModelDialogState extends State<_ModelDialog> {
               enabled: !_smart,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                  labelText: tr(context, 'providers.contextWindow')),
+                labelText: tr(context, 'providers.contextWindow'),
+                isDense: true,
+              ),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -1526,26 +1657,165 @@ class _ModelDialogState extends State<_ModelDialog> {
               enabled: !_smart,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                  labelText: tr(context, 'providers.maxOutput')),
+                labelText: tr(context, 'providers.maxOutput'),
+                isDense: true,
+              ),
             ),
+            // Advanced section — manual mode only (smart config lets the
+            // desktop fill in the recommended values, official
+            // addPersonalModel useRecommendedConfig=true).
+            if (!_smart) ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(ZRadius.mini),
+                onTap: () => setState(() => _advOpen = !_advOpen),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 6, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Text(tr(context, 'providers.advanced'),
+                          style: ZType.body
+                              .copyWith(color: ZInk.muted(context))),
+                      const SizedBox(width: 6),
+                      AnimatedRotation(
+                        turns: _advOpen ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(Icons.chevron_right,
+                            size: 16, color: ZInk.faint(context)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox(width: double.infinity),
+                secondChild: _advancedBody(context),
+                crossFadeState: _advOpen
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+                sizeCurve: Curves.easeOutCubic,
+              ),
+            ],
           ],
         ),
       ),
       actions: [
         TextButton(
+          style: _actionStyle,
           onPressed: _reset,
           child: Text(tr(context, 'providers.resetForm')),
         ),
         TextButton(
+          style: _actionStyle,
           onPressed: () => Navigator.pop(context),
           child: Text(tr(context, 'devices.add.cancel')),
         ),
         FilledButton(
+          style: _actionStyle,
           onPressed: _id.text.trim().isEmpty
               ? null
               : () => _submit(context),
           child: Text(tr(context, 'devices.rename.save')),
         ),
+      ],
+    );
+  }
+
+  /// Advanced section body (mock panel ③): input types / capabilities /
+  /// reasoning chips — plain hairline partitions,素色 like the mock.
+  Widget _advancedBody(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        const SizedBox(height: 8),
+        Text(tr(context, 'providers.sectionInput'),
+            style: ZType.sub.copyWith(color: ZInk.faint(context))),
+        _capabilityRow(
+          context,
+          label: tr(context, 'providers.capVision'),
+          desc: tr(context, 'providers.capVisionDesc'),
+          value: _vision,
+          onChanged: (v) => setState(() => _vision = v),
+        ),
+        const SizedBox(height: 10),
+        Text(tr(context, 'providers.sectionCapabilities'),
+            style: ZType.sub.copyWith(color: ZInk.faint(context))),
+        _capabilityRow(
+          context,
+          label: tr(context, 'providers.capJsonSchema'),
+          value: _jsonSchema,
+          onChanged: (v) => setState(() => _jsonSchema = v),
+        ),
+        _capabilityRow(
+          context,
+          label: tr(context, 'providers.capWebSearch'),
+          value: _webSearch,
+          onChanged: (v) => setState(() => _webSearch = v),
+        ),
+        _capabilityRow(
+          context,
+          label: tr(context, 'providers.capMidSystem'),
+          value: _midSystem,
+          onChanged: (v) => setState(() => _midSystem = v),
+        ),
+        if (widget.reasoningLevels.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(tr(context, 'providers.sectionReasoning'),
+              style: ZType.sub.copyWith(color: ZInk.faint(context))),
+          Text(tr(context, 'providers.sectionReasoningHint'),
+              style: ZType.caption.copyWith(color: ZInk.faint(context))),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final level in widget.reasoningLevels)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: ZInk.tile(context),
+                    borderRadius:
+                        BorderRadius.circular(ZRadius.field),
+                    border: Border.all(color: ZInk.hairline(context)),
+                  ),
+                  child: Text(level,
+                      style: ZType.body
+                          .copyWith(color: ZInk.soft(context))),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// One tap-switch row of the advanced section (name + optional desc,
+  /// switch right).
+  Widget _capabilityRow(
+    BuildContext context, {
+    required String label,
+    String? desc,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: ZType.body.copyWith(color: ZInk.solid(context))),
+              if (desc != null)
+                Text(desc,
+                    style: ZType.caption
+                        .copyWith(color: ZInk.faint(context))),
+            ],
+          ),
+        ),
+        Switch(value: value, onChanged: onChanged),
       ],
     );
   }
