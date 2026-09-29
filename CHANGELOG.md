@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-09-29
+
+### Added
+
+- **Model & conversation configuration**: per-new-task defaults (permission
+  mode / model / thinking level) with a three-tier fallback chain and i18n
+  vocabulary rendering fixes; model settings migrated to the
+  `provider-settings` channel (official alignment + `/models` pull
+  enhancement); model advanced-configuration section with visual badges and
+  add-model dialog proportions; model-dialog input font size aligned with
+  body text.
+- **Chat file preview** (official phone-client parity): file channel port
+  (absolute-path rule), inline markdown local images, full-screen media
+  viewer, and HTML dual view (rendered page + source).
+- **Landscape adaptation**: P0 overflow fixes, safe-area padding slots,
+  message/composer column caps (848/864dp), short-viewport collapse, plus
+  real-device punch-hole fixes and immersive look in all four orientations.
+
+### Changed
+
+- **Swipe tray redesign**: neutral tray with F1 slider-groove geometry and
+  ZInk success/warning tone slots.
+
+### Fixed
+
+- **Status color foregrounds** all routed through ZInk tone slots —
+  light-theme readability fix.
+
 ## [1.12.2] - 2026-09-26
 
 ### Added
