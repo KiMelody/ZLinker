@@ -284,3 +284,10 @@ devices_page(多设备管理/剪贴板检测/排序置顶)、qr_scan_page(扫码
 - 测试:sheet_scaffold_test 新增(token 值/zScreenPadding inset 叠加/0.85 限高滚动/键盘让位按钮可点);task_list_page_test 横屏单栏用例;全量绿,analyze 0 警告。
 - ⚠️ 已知限制:手机横屏+软键盘下聊天输入仍不可用(键盘 250px 占掉 390 高的大半,残余输入区过矮)——轻量缓解只覆盖无键盘状态;根治需方向 B。
 - 远期项(方向 B,挂 backlog):聊天全屏输入覆盖层(横屏唤起键盘时切全屏编辑,发送返回);次级页面平板双栏内嵌(列表+详情同屏)。锁竖屏(方向 C)已排除(用户拍板)。
+
+## 文件预览批次实现记录(2026-09-29,任务 09-29-file-preview,真机验收通过)
+
+- **新增能力(官方 parity + native 增强)**:①markdown 本地图片内联(官方 MarkdownImage→readMediaPreview 同款,ZLinker 此前完全不渲染);②全屏图片查看器(native-only,黑底 InteractiveViewer 0.5–8x,三类内联图——markdown/附件/工具 base64——统一入口);③HTML 预览页(native-only 双视图:WebView 真渲染 + 源码,官方手机端 HTML 仅源码视图且预览卡被 compactForRemoteControl 压制);④外链资源拼装(HtmlAssembler:深度 2/40 文件/单 2MB/总 8MB/白名单,失败占位不中断);⑤三入口:工具行文件名/变更文件列表(_JsonSheet→文件行 sheet)/markdown 文件链接(本地分流+http 系统浏览器)。
+- **协议层**:`file` 通道 FileServicePort(stat/readMediaPreview/readTextFile,MethodProbe 候选);live 探针定证(3.14.3):workspacePath 字段被桌面忽略、**相对路径按桌面进程 CWD 解析→必须绝对路径**,UI 侧 `_ChatPreview._absolute` 做工作区拼接;readTextFile 文本字段=content、分页=truncated(初版猜 text 已修)。契约沉淀 `.trellis/spec/protocol/file-service.md`(本地)。
+- ⚠️ 有意差异:全屏查看器与 HTML 真渲染均超出官方手机端(用户拍板);预览卡(website/htmlWebsite)官方手机端自己压制,ZLinker 不做才是对齐。
+- 测试:file_service/html_assembly/image_viewer/file_preview/file_entry_dispatch 新建+markdown_view 增量,全量 896 绿,analyze 0 警告;真机(xuanyuan)按 AC2 清单验收通过。
