@@ -1596,6 +1596,21 @@ class _ModelDialogState extends State<_ModelDialog> {
             borderRadius: BorderRadius.circular(ZRadius.field)),
       );
 
+  /// Field text matches the dialog's body copy (default M3 bodyLarge 16
+  /// reads oversized next to the 13dp labels/switch rows).
+  TextStyle get _fieldStyle =>
+      ZType.body.copyWith(color: ZInk.solid(context));
+
+  /// Shared field decoration: empty-state placeholder at body 13 (M3
+  /// default 16 reads oversized), floated label stays caption 12.
+  InputDecoration _fieldDecoration(String label) => InputDecoration(
+        labelText: label,
+        isDense: true,
+        labelStyle: ZType.body.copyWith(color: ZInk.muted(context)),
+        floatingLabelStyle:
+            ZType.caption.copyWith(color: ZInk.muted(context)),
+      );
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -1620,10 +1635,9 @@ class _ModelDialogState extends State<_ModelDialog> {
             ),
             TextField(
               controller: _id,
-              decoration: InputDecoration(
-                labelText: tr(context, 'providers.modelId'),
-                isDense: true,
-              ),
+              style: _fieldStyle,
+              decoration:
+                  _fieldDecoration(tr(context, 'providers.modelId')),
             ),
             if (!widget.isEdit && widget.fetchIds != null)
               Align(
@@ -1645,21 +1659,19 @@ class _ModelDialogState extends State<_ModelDialog> {
             TextField(
               controller: _context,
               enabled: !_smart,
+              style: _fieldStyle,
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: tr(context, 'providers.contextWindow'),
-                isDense: true,
-              ),
+              decoration:
+                  _fieldDecoration(tr(context, 'providers.contextWindow')),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _max,
               enabled: !_smart,
+              style: _fieldStyle,
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: tr(context, 'providers.maxOutput'),
-                isDense: true,
-              ),
+              decoration:
+                  _fieldDecoration(tr(context, 'providers.maxOutput')),
             ),
             // Advanced section — manual mode only (smart config lets the
             // desktop fill in the recommended values, official
