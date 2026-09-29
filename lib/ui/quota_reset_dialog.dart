@@ -77,7 +77,8 @@ class _QuotaResetDialog extends StatelessWidget {
                   child: Text(
                     trP(context, 'usage.reset.failed',
                         [controller.error ?? '-']),
-                    style: ZType.caption.copyWith(color: ZColors.danger),
+                    style:
+                        ZType.caption.copyWith(color: ZInk.dangerTone(context)),
                   ),
                 ),
             ],

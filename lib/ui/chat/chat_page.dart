@@ -2287,12 +2287,12 @@ class _ChatPageState extends State<ChatPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 20, color: ZColors.danger),
+              Icon(Icons.error_outline, size: 20, color: ZInk.dangerTone(context)),
               const SizedBox(height: 8),
               Text(
                 tr(context, 'chat.session.startFailedTitle'),
                 textAlign: TextAlign.center,
-                style: ZType.heading.copyWith(color: ZColors.danger),
+                style: ZType.heading.copyWith(color: ZInk.dangerTone(context)),
               ),
               const SizedBox(height: 4),
               Text(
@@ -2490,7 +2490,7 @@ class _ChatPageState extends State<ChatPage> {
                       tr(context, 'chat.quota.exhaustedTitle'),
                       style: ZType.sub.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: ZColors.danger,
+                        color: ZInk.dangerTone(context),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -2704,10 +2704,10 @@ class _ChatPageState extends State<ChatPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.phonelink_erase_outlined,
                   size: 44,
-                  color: ZColors.danger,
+                  color: ZInk.dangerTone(context),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -4226,9 +4226,9 @@ class _ToolCallTileState extends State<_ToolCallTile> {
     // stays here because it is theme-dependent.
     final color = switch (status) {
       'running' || 'inputStreaming' || 'pendingApproval' => ZColors.sky400,
-      'success' => ZColors.success,
-      'error' => ZColors.danger,
-      'cancelled' => ZColors.warning,
+      'success' => ZInk.successTone(context),
+      'error' => ZInk.dangerTone(context),
+      'cancelled' => ZInk.warningTone(context),
       _ => ZInk.faint(context),
     };
 
@@ -4267,7 +4267,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
             padding: const EdgeInsets.only(left: 8),
             child: Text(
               '+${summary.additions}',
-              style: ZType.caption.copyWith(color: ZColors.success),
+              style: ZType.caption.copyWith(color: ZInk.successTone(context)),
             ),
           ),
         if (summary.deletions > 0)
@@ -4275,7 +4275,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
             padding: const EdgeInsets.only(left: 4),
             child: Text(
               '-${summary.deletions}',
-              style: ZType.caption.copyWith(color: ZColors.danger),
+              style: ZType.caption.copyWith(color: ZInk.dangerTone(context)),
             ),
           ),
         if (canOpen)
@@ -4708,12 +4708,12 @@ class _FileChangesBar extends StatelessWidget {
                   if (adds > 0)
                     TextSpan(
                       text: '  +$adds',
-                      style: const TextStyle(color: ZColors.success),
+                      style: TextStyle(color: ZInk.successTone(context)),
                     ),
                   if (dels > 0)
                     TextSpan(
                       text: '  -$dels',
-                      style: const TextStyle(color: ZColors.danger),
+                      style: TextStyle(color: ZInk.dangerTone(context)),
                     ),
                 ],
               ),
@@ -4785,7 +4785,8 @@ class _FileChangesBar extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           tr(dialogCtx, 'chat.rewind.cannotApply'),
-                          style: ZType.body.copyWith(color: ZColors.danger),
+                          style: ZType.body.copyWith(
+                              color: ZInk.dangerTone(dialogCtx)),
                         ),
                       ),
                     for (final f in files.take(12))
@@ -4889,12 +4890,12 @@ class _TimelineMarkerWidget extends StatelessWidget {
           '${marker['fromModel'] ?? ''}',
           '${marker['toModel'] ?? ''}',
         ]),
-        ZColors.warning,
+        ZInk.warningTone(context),
       ),
       'goalSet' => (
         Icons.flag_outlined,
         trP(context, 'chat.marker.goalSet', ['${marker['objective'] ?? ''}']),
-        ZColors.success,
+        ZInk.successTone(context),
       ),
       'goalVerify' => (
         Icons.fact_check_outlined,
@@ -4902,7 +4903,7 @@ class _TimelineMarkerWidget extends StatelessWidget {
           '${marker['iteration'] ?? '?'}',
           '${marker['outcome'] ?? ''}',
         ]),
-        ZColors.success,
+        ZInk.successTone(context),
       ),
       'retryNotice' => (
         Icons.refresh,
@@ -4910,7 +4911,7 @@ class _TimelineMarkerWidget extends StatelessWidget {
           '${marker['attempt'] ?? '?'}',
           '${marker['reasonCode'] ?? ''}',
         ]),
-        ZColors.warning,
+        ZInk.warningTone(context),
       ),
       'checkpointRestored' => (
         Icons.restore,
@@ -5083,7 +5084,8 @@ class _GoalBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.flag_outlined, size: 14, color: ZColors.success),
+          Icon(Icons.flag_outlined,
+              size: 14, color: ZInk.successTone(context)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -5096,7 +5098,8 @@ class _GoalBanner extends StatelessWidget {
           if (status.isNotEmpty)
             Text(
               status,
-              style: ZType.caption.copyWith(color: ZColors.success),
+              style:
+                  ZType.caption.copyWith(color: ZInk.successTone(context)),
             ),
         ],
       ),
@@ -5633,17 +5636,17 @@ class _SubagentSheetState extends State<_SubagentSheet> {
     final (icon, color, wordKey) = switch (status) {
       'success' => (
           Icons.check,
-          ZColors.success,
+          ZInk.successTone(context),
           'chat.subagent.status.success',
         ),
       'error' || 'failed' || 'denied' => (
           Icons.close,
-          ZColors.danger,
+          ZInk.dangerTone(context),
           'chat.subagent.status.failed',
         ),
       _ => (
           Icons.block,
-          ZColors.warning,
+          ZInk.warningTone(context),
           'chat.subagentSheet.status.stopped',
         ),
     };
@@ -5731,7 +5734,7 @@ class _SheetActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? ZColors.danger : ZInk.soft(context);
+    final color = danger ? ZInk.dangerTone(context) : ZInk.soft(context);
     return OutlinedButton(
       style: OutlinedButton.styleFrom(
         visualDensity: VisualDensity.compact,
@@ -6241,7 +6244,7 @@ class _ReplayableQueueBar extends StatelessWidget {
                               color:
                                   items[i].state ==
                                       ReplayableQueueItemState.failed
-                                  ? ZColors.danger
+                                  ? ZInk.dangerTone(context)
                                   : ZInk.muted(context),
                             ),
                           ),
@@ -6472,10 +6475,10 @@ class _InteractionCardState extends State<_InteractionCard> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.privacy_tip_outlined,
                 size: 14,
-                color: ZColors.warning,
+                color: ZInk.warningTone(context),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -6613,7 +6616,11 @@ class _InteractionCardState extends State<_InteractionCard> {
 }
 
 /// trustState values carried by the workspaceHookReview interaction items
-/// (3.12.3 wire enum) with a badge color each.
+/// (3.12.3 wire enum) with a badge color each. The colors below are base
+/// (dark) references only — [_trustBadge] resolves every state through its
+/// ZInk tone slot at the use site so the label stays readable in light mode;
+/// the key set here must stay complete — the badge label lookup relies on
+/// [containsKey].
 const _hookTrustStates = <String, Color>{
   'not_applicable': ZColors.neutral500,
   'pending_trust': ZColors.warning,
@@ -6690,10 +6697,10 @@ class _HookReviewCardState extends State<_HookReviewCard> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.fact_check_outlined,
                 size: 14,
-                color: ZColors.warning,
+                color: ZInk.warningTone(context),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -6832,7 +6839,13 @@ class _HookReviewItem extends StatelessWidget {
 
   Widget _trustBadge(BuildContext context, String trustState) {
     if (trustState.isEmpty) return const SizedBox.shrink();
-    final color = _hookTrustStates[trustState] ?? ZColors.neutral500;
+    final color = switch (trustState) {
+      'blocked_untrusted' || 'blocked_policy' || 'revoked' =>
+        ZInk.dangerTone(context),
+      'pending_trust' || 'stale_digest' => ZInk.warningTone(context),
+      'trusted_persistent' => ZInk.successTone(context),
+      _ => _hookTrustStates[trustState] ?? ZColors.neutral500,
+    };
     // Known enums render their localized label; unknown ones fall back to
     // the raw wire value instead of a broken tr key.
     final label = _hookTrustStates.containsKey(trustState)
@@ -8351,10 +8364,10 @@ class _SkillsPickerSheet extends StatelessWidget {
                     for (final s in list)
                       ListTile(
                         dense: true,
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.auto_awesome_outlined,
                           size: 18,
-                          color: ZColors.warning,
+                          color: ZInk.warningTone(context),
                         ),
                         title: Text(
                           '\$${s.name}',
@@ -9113,7 +9126,7 @@ class _StopButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(ZRadius.mini),
               ),
               child: Center(
-                child: Icon(Icons.stop, color: ZColors.danger, size: 20),
+                child: Icon(Icons.stop, color: ZInk.dangerTone(context), size: 20),
               ),
             ),
           ),

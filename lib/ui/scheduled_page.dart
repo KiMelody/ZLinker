@@ -190,9 +190,9 @@ class _ScheduledPageState extends State<ScheduledPage> {
 
   Widget _itemCard(ScheduledMessage m) {
     final (label, color) = m.sent
-        ? (tr(context, 'sched.sent'), ZColors.success)
+        ? (tr(context, 'sched.sent'), ZInk.successTone(context))
         : m.attempts >= MessageScheduler.maxAttempts
-            ? (tr(context, 'sched.failed'), ZColors.danger)
+            ? (tr(context, 'sched.failed'), ZInk.dangerTone(context))
             : (tr(context, 'sched.pending'), ZColors.sky500);
     return Card(
       child: Padding(
@@ -244,8 +244,8 @@ class _ScheduledPageState extends State<ScheduledPage> {
                         m.lastError!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            ZType.caption.copyWith(color: ZColors.danger),
+                        style: ZType.caption
+                            .copyWith(color: ZInk.dangerTone(context)),
                       ),
                     ),
                 ],

@@ -515,18 +515,20 @@ Future<void> _pickTemplate() async {
   }
 
   /// lifecycleStatus 徽标 (A3)：active=正常不显，completed/failed/paused
-  /// 显色点+文案。返回 (色, tr key)。
-  (Color, String)? _lifecycleBadge(AutomationItem item) =>
+  /// 显色点+文案。前景走 ZInk tone 槽位（light 下原 dark 亮色不可读）。
+  /// 返回 (色, tr key)。
+  (Color, String)? _lifecycleBadge(BuildContext context, AutomationItem item) =>
       switch (item.lifecycleStatus) {
-        'completed' => (ZColors.success, 'auto.lifecycle.completed'),
-        'failed' => (ZColors.danger, 'auto.lifecycle.failed'),
-        'paused' => (ZColors.warning, 'auto.lifecycle.paused'),
+        'completed' => (ZInk.successTone(context), 'auto.lifecycle.completed'),
+        'failed' => (ZInk.dangerTone(context), 'auto.lifecycle.failed'),
+        'paused' => (ZInk.warningTone(context), 'auto.lifecycle.paused'),
         _ => null,
       };
 
   Widget _itemCard(AutomationItem item) {
-    final dotColor = item.enabled ? ZColors.success : ZColors.neutral400;
-    final lifecycle = _lifecycleBadge(item);
+    final dotColor =
+        item.enabled ? ZInk.successTone(context) : ZColors.neutral400;
+    final lifecycle = _lifecycleBadge(context, item);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -580,7 +582,7 @@ Future<void> _pickTemplate() async {
                         style: ZType.caption.copyWith(
                             fontWeight: FontWeight.w500,
                             color: item.enabled
-                                ? ZColors.success
+                                ? ZInk.successTone(context)
                                 : ZInk.muted(context),
                         ),
                       ),

@@ -1892,7 +1892,7 @@ class _TaskListPageState extends State<TaskListPage>
         tr(context, 'tasks.awaiting'),
         style: ZType.caption.copyWith(
           fontWeight: FontWeight.w500,
-          color: ZColors.warning,
+          color: ZInk.warningTone(context),
         ),
       ),
     );
@@ -2090,11 +2090,11 @@ class _TaskListPageState extends State<TaskListPage>
               ListTile(
                 leading: Icon(
                   Icons.delete_outline,
-                  color: ZColors.danger,
+                  color: ZInk.dangerTone(sheetCtx),
                 ),
                 title: Text(
                   tr(sheetCtx, 'tasks.action.delete'),
-                  style: TextStyle(color: ZColors.danger),
+                  style: TextStyle(color: ZInk.dangerTone(sheetCtx)),
                 ),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
@@ -2460,7 +2460,7 @@ class _ConnectionBanner extends StatelessWidget {
       title = tr(context, 'status.kicked');
       body = tr(context, 'tasks.banner.kicked');
       icon = Icons.phonelink_erase_outlined;
-      color = ZColors.danger;
+      color = ZInk.dangerTone(context);
     } else if (s.status == DeviceStatus.connecting) {
       title = tr(context, 'status.connecting');
       body = tr(context, 'tasks.banner.connecting');
@@ -2470,7 +2470,7 @@ class _ConnectionBanner extends StatelessWidget {
       title = tr(context, 'tasks.fallback.title');
       body = _failureBody(context, s);
       icon = Icons.cloud_off;
-      color = ZColors.danger;
+      color = ZInk.dangerTone(context);
     }
     return Card(
       child: Padding(

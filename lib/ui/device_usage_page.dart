@@ -660,7 +660,8 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(tr(context, 'usageRpc.appUsageFailed'),
-                        style: ZType.sub.copyWith(color: ZColors.danger)),
+                        style: ZType.sub.copyWith(
+                            color: ZInk.dangerTone(context))),
                     TextButton.icon(
                       icon: const Icon(Icons.refresh, size: 16),
                       onPressed: _loadAppUsage,
@@ -752,8 +753,8 @@ class _DeviceUsagePageState extends State<DeviceUsagePage> {
                     children: [
                       Expanded(
                         child: Text(tr(context, 'usageRpc.appUsageFailed'),
-                            style: ZType.caption
-                                .copyWith(color: ZColors.danger)),
+                            style: ZType.caption.copyWith(
+                                color: ZInk.dangerTone(context))),
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.refresh, size: 16),

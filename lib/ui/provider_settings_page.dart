@@ -1000,7 +1000,7 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
                   : 'providers.notEntitled'),
               style: ZType.caption.copyWith(
                   color: entry.entitled
-                      ? ZColors.success
+                      ? ZInk.successTone(context)
                       : ZInk.muted(context)),
             ),
           ],
@@ -1079,8 +1079,8 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(issue.message,
-                    style:
-                        ZType.caption.copyWith(color: ZColors.warning)),
+                    style: ZType.caption
+                        .copyWith(color: ZInk.warningTone(context))),
               ),
             const SizedBox(height: ZSpacing.card),
             SizedBox(
@@ -1207,7 +1207,7 @@ class _ProviderDetailPageState extends State<_ProviderDetailPage> {
                 if (model.issues.isNotEmpty)
                   Text(model.issues.first.message,
                       style: ZType.caption
-                          .copyWith(color: ZColors.warning)),
+                          .copyWith(color: ZInk.warningTone(context))),
               ],
             ),
           ),
