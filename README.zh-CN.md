@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **ZLinker 已更名为 ZGo** → 新仓库：[KiMelody/ZGo](https://github.com/KiMelody/ZGo)，后续版本与更新仅在新仓库发布。
+
 <div align="center">
 
 # ZLinker
