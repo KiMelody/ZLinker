@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **ZLinker has been renamed to ZGo** → new home: [KiMelody/ZGo](https://github.com/KiMelody/ZGo) — all future releases and updates live there.
+
 <div align="center">
 
 # ZLinker
